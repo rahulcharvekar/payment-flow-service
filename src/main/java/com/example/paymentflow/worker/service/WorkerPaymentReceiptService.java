@@ -5,7 +5,7 @@ import com.example.paymentflow.worker.entity.WorkerPaymentReceipt;
 import com.example.paymentflow.worker.repository.WorkerPaymentReceiptRepository;
 import com.example.paymentflow.worker.dao.WorkerPaymentReceiptQueryDao;
 import org.slf4j.Logger;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider;
+import com.shared.utilities.logger.LoggerFactoryProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

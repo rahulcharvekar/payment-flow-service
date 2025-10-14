@@ -3,8 +3,8 @@ package com.example.paymentflow.worker.service;
 import com.example.paymentflow.worker.entity.WorkerPayment;
 import com.example.paymentflow.worker.repository.WorkerPaymentRepository;
 import com.example.paymentflow.worker.dao.WorkerPaymentQueryDao;
-import com.example.paymentflow.common.dao.BaseQueryDao.PageResult;
-import com.example.paymentflow.exception.ResourceNotFoundException; // Uncomment if exists
+import com.shared.common.dao.BaseQueryDao.PageResult;
+import com.shared.exception.ResourceNotFoundException; // Uncomment if exists
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

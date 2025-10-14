@@ -1,4 +1,4 @@
-package com.example.paymentflow.common.security;
+package com.example.paymentflow.utilities.security;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.jsonwebtoken.io.Decoders;

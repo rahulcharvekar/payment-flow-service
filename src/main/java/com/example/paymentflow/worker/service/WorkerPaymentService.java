@@ -1,14 +1,14 @@
 package com.example.paymentflow.worker.service;
 
 import com.example.paymentflow.worker.entity.WorkerPayment;
-import com.example.paymentflow.exception.ResourceNotFoundException;
+import com.shared.exception.ResourceNotFoundException;
 import com.example.paymentflow.worker.repository.WorkerPaymentRepository;
 import com.example.paymentflow.worker.dao.WorkerPaymentQueryDao;
-import com.example.paymentflow.common.dao.BaseQueryDao.PageResult; // Uncomment if exists
+import com.shared.common.dao.BaseQueryDao.PageResult; // Uncomment if exists
 import java.util.List;
 import java.time.LocalDateTime;
 import org.slf4j.Logger;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider; // Uncomment if exists
+import com.shared.utilities.logger.LoggerFactoryProvider; // Uncomment if exists
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;

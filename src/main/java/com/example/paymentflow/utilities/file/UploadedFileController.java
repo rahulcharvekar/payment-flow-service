@@ -1,15 +1,17 @@
 package com.example.paymentflow.utilities.file;
 
-import com.example.paymentflow.audit.annotation.Audited;
-
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import com.shared.audit.annotation.Audited;
+import com.shared.utilities.logger.LoggerFactoryProvider;
+
 import org.slf4j.Logger;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -51,7 +53,7 @@ public class UploadedFileController {
                 required = true
             )
             @jakarta.validation.Valid @RequestBody 
-            com.example.paymentflow.common.dto.SecurePaginationRequest request) {
+            com.shared.common.dto.SecurePaginationRequest request) {
         
         log.info("Secure paginated request for uploaded files: startDate={}, endDate={}, page={}, size={}", 
                 request.getStartDate(), request.getEndDate(), request.getPage(), request.getSize());

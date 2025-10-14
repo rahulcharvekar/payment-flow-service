@@ -1,4 +1,4 @@
-package com.example.paymentflow.common.security;
+package com.example.paymentflow.utilities.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;

@@ -1,6 +1,6 @@
 package com.example.paymentflow.employer.controller;
 
-import com.example.paymentflow.audit.annotation.Audited;
+import com.shared.audit.annotation.Audited;
 
 import com.example.paymentflow.employer.entity.EmployerPaymentReceipt;
 import com.example.paymentflow.employer.service.EmployerPaymentReceiptService;
@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider;
+import com.shared.utilities.logger.LoggerFactoryProvider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -34,33 +34,33 @@ public class EmployerPaymentReceiptController {
     @PostMapping("/available/secure")
     @Operation(summary = "Get available worker receipts with secure pagination and filtering",
                description = "Returns paginated worker receipts with optional status and date range filters, using secure pagination (mandatory date range, opaque tokens)")
-    @com.example.paymentflow.common.annotation.SecurePagination
+    @com.shared.common.annotation.SecurePagination
     public ResponseEntity<?> getAvailableReceiptsSecure(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Secure pagination request with mandatory date range",
                 required = true
             )
             @jakarta.validation.Valid @RequestBody
-            com.example.paymentflow.common.dto.SecurePaginationRequest request,
+            com.shared.common.dto.SecurePaginationRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
         log.info("Fetching available receipts with secure pagination, status: {}, request: {}", request.getStatus(), request);
         try {
             // Apply pageToken if present
-            com.example.paymentflow.common.util.SecurePaginationUtil.applyPageToken(request);
-            com.example.paymentflow.common.util.SecurePaginationUtil.ValidationResult validation =
-                com.example.paymentflow.common.util.SecurePaginationUtil.validatePaginationRequest(request);
+            com.shared.common.util.SecurePaginationUtil.applyPageToken(request);
+            com.shared.common.util.SecurePaginationUtil.ValidationResult validation =
+                com.shared.common.util.SecurePaginationUtil.validatePaginationRequest(request);
             if (!validation.isValid()) {
                 return ResponseEntity.badRequest().body(
-                    com.example.paymentflow.common.util.SecurePaginationUtil.createErrorResponse(validation));
+                    com.shared.common.util.SecurePaginationUtil.createErrorResponse(validation));
             }
             // Use only nextPageToken and filters for cursor-based pagination
             String nextPageToken = request.getPageToken();
             org.springframework.data.domain.Page<EmployerPaymentReceipt> receiptsPage =
                 service.findAvailableByStatusAndDateRangeWithToken(request.getStatus(), validation.getStartDateTime(), validation.getEndDateTime(), nextPageToken);
-            com.example.paymentflow.common.dto.SecurePaginationResponse<EmployerPaymentReceipt> response =
-                com.example.paymentflow.common.util.SecurePaginationUtil.createSecureResponse(receiptsPage, request);
+            com.shared.common.dto.SecurePaginationResponse<EmployerPaymentReceipt> response =
+                com.shared.common.util.SecurePaginationUtil.createSecureResponse(receiptsPage, request);
             String responseJson = objectMapper.writeValueAsString(response);
-            String eTag = com.example.paymentflow.common.util.ETagUtil.generateETag(responseJson);
+            String eTag = com.shared.common.util.ETagUtil.generateETag(responseJson);
             String ifNoneMatch = httpRequest.getHeader(org.springframework.http.HttpHeaders.IF_NONE_MATCH);
             if (eTag.equals(ifNoneMatch)) {
                 return ResponseEntity.status(304).eTag(eTag).build();

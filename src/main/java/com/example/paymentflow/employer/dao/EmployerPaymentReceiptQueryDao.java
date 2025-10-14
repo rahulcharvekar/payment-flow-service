@@ -1,6 +1,6 @@
 package com.example.paymentflow.employer.dao;
 
-import com.example.paymentflow.common.dao.BaseQueryDao;
+import com.shared.common.dao.BaseQueryDao;
 import com.example.paymentflow.employer.entity.EmployerPaymentReceipt;
 import org.springframework.stereotype.Repository;
 

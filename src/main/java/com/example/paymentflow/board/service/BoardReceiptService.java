@@ -3,11 +3,11 @@ package com.example.paymentflow.board.service;
 import com.example.paymentflow.board.entity.BoardReceipt;
 
 import com.example.paymentflow.employer.entity.EmployerPaymentReceipt;
-import com.example.paymentflow.exception.ResourceNotFoundException;
+import com.shared.exception.ResourceNotFoundException;
 import com.example.paymentflow.board.dao.BoardReceiptRepository;
 import com.example.paymentflow.board.dao.BoardReceiptQueryDao;
 import org.slf4j.Logger;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider;
+import com.shared.utilities.logger.LoggerFactoryProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;

@@ -7,7 +7,7 @@ import com.example.paymentflow.worker.repository.WorkerUploadedDataRepository;
 import com.example.paymentflow.utilities.file.UploadedFileRepository;
 import com.example.paymentflow.utilities.file.UploadedFile;
 import org.slf4j.Logger;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider;
+import com.shared.utilities.logger.LoggerFactoryProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

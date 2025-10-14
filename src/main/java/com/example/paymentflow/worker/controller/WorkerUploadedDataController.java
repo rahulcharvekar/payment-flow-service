@@ -12,13 +12,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
 import jakarta.servlet.http.HttpServletRequest;
-import com.example.paymentflow.common.util.ETagUtil;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider;
+import com.shared.common.util.ETagUtil;
+import com.shared.utilities.logger.LoggerFactoryProvider;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import com.example.paymentflow.audit.annotation.Audited;
+import com.shared.audit.annotation.Audited;
 import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -52,43 +52,43 @@ public class WorkerUploadedDataController {
     @Operation(summary = "Get secure paginated uploaded data", 
                description = "Retrieve paginated uploaded data with MANDATORY date range filtering for security. " +
                            "Prevents unrestricted data access and implements tamper-proof pagination tokens.")
-    @com.example.paymentflow.common.annotation.SecurePagination
-    @com.example.paymentflow.common.annotation.UiType(value = com.example.paymentflow.common.util.UiTypes.LIST, usage = "Display paginated list of uploaded data with sorting and filtering")
+    @com.shared.common.annotation.SecurePagination
+    @com.shared.common.annotation.UiType(value = com.shared.common.util.UiTypes.LIST, usage = "Display paginated list of uploaded data with sorting and filtering")
     public ResponseEntity<?> getSecurePaginatedUploadedData(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Secure pagination request with mandatory date range",
                 required = true
             )
             @jakarta.validation.Valid @RequestBody 
-            com.example.paymentflow.common.dto.SecurePaginationRequest request,
+            com.shared.common.dto.SecurePaginationRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
         
         log.info("Secure paginated request for uploaded data: {}", request);
         try {
             // Apply pageToken if present
-            com.example.paymentflow.common.util.SecurePaginationUtil.applyPageToken(request);
+            com.shared.common.util.SecurePaginationUtil.applyPageToken(request);
             // Validate request using utility
-            com.example.paymentflow.common.util.SecurePaginationUtil.ValidationResult validation = 
-                com.example.paymentflow.common.util.SecurePaginationUtil.validatePaginationRequest(request);
+            com.shared.common.util.SecurePaginationUtil.ValidationResult validation = 
+                com.shared.common.util.SecurePaginationUtil.validatePaginationRequest(request);
             if (!validation.isValid()) {
                 return ResponseEntity.badRequest().body(
-                    com.example.paymentflow.common.util.SecurePaginationUtil.createErrorResponse(validation));
+                    com.shared.common.util.SecurePaginationUtil.createErrorResponse(validation));
             }
             // Create pageable with secure field validation
             List<String> allowedSortFields = List.of("id", "workerName", "employerId", "paymentAmount", "status", "createdAt", "workDate", "receiptNumber");
-            org.springframework.data.domain.Sort sort = com.example.paymentflow.common.util.SecurePaginationUtil.createSecureSort(request, allowedSortFields);
+            org.springframework.data.domain.Sort sort = com.shared.common.util.SecurePaginationUtil.createSecureSort(request, allowedSortFields);
             org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 request.getPage(), Math.min(request.getSize(), 100), sort);
             // Get paginated data with date filtering
             org.springframework.data.domain.Page<WorkerUploadedData> dataPage = 
                 service.findByDateRangePaginated(validation.getStartDateTime(), validation.getEndDateTime(), pageable);
             // Create secure response with opaque tokens
-            com.example.paymentflow.common.dto.SecurePaginationResponse<WorkerUploadedData> response = 
-                com.example.paymentflow.common.util.SecurePaginationUtil.createSecureResponse(dataPage, request);
+            com.shared.common.dto.SecurePaginationResponse<WorkerUploadedData> response = 
+                com.shared.common.util.SecurePaginationUtil.createSecureResponse(dataPage, request);
             com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
             objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
             String responseJson = objectMapper.writeValueAsString(response);
-            String eTag = com.example.paymentflow.common.util.ETagUtil.generateETag(responseJson);
+            String eTag = com.shared.common.util.ETagUtil.generateETag(responseJson);
             String ifNoneMatch = httpRequest.getHeader(org.springframework.http.HttpHeaders.IF_NONE_MATCH);
             if (eTag.equals(ifNoneMatch)) {
                 return ResponseEntity.status(304).eTag(eTag).build();
@@ -107,7 +107,7 @@ public class WorkerUploadedDataController {
     @Audited(action = "UPLOAD_WORKER_PAYMENT_FILE", resourceType = "WORKER_UPLOADED_DATA")
     @Operation(summary = "Upload worker payment file", 
                description = "Upload CSV, XLS, or XLSX file containing worker payment data. Returns fileId for subsequent operations.")
-    @com.example.paymentflow.common.annotation.UiType(value = com.example.paymentflow.common.util.UiTypes.UPLOAD, usage = "File upload button for worker payment data")
+    @com.shared.common.annotation.UiType(value = com.shared.common.util.UiTypes.UPLOAD, usage = "File upload button for worker payment data")
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
             // File type check
@@ -162,20 +162,20 @@ public class WorkerUploadedDataController {
     @PostMapping("/files/secure-summaries")
     @Operation(summary = "Get secure paginated file summaries", 
                description = "Returns paginated list of all uploaded files with comprehensive summaries, validation counts, and total amounts. Uses secure pagination with mandatory date range and opaque tokens.")
-    @com.example.paymentflow.common.annotation.SecurePagination
+    @com.shared.common.annotation.SecurePagination
     public ResponseEntity<?> getSecurePaginatedFileSummaries(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Secure pagination request with mandatory date range",
                 required = true
             )
             @jakarta.validation.Valid @RequestBody 
-            com.example.paymentflow.common.dto.SecurePaginationRequest request) {
+            com.shared.common.dto.SecurePaginationRequest request) {
         log.info("Secure paginated file summaries request: {}", request);
-        com.example.paymentflow.common.util.SecurePaginationUtil.ValidationResult validation = 
-            com.example.paymentflow.common.util.SecurePaginationUtil.validatePaginationRequest(request);
+        com.shared.common.util.SecurePaginationUtil.ValidationResult validation = 
+            com.shared.common.util.SecurePaginationUtil.validatePaginationRequest(request);
         if (!validation.isValid()) {
             return ResponseEntity.badRequest().body(
-                com.example.paymentflow.common.util.SecurePaginationUtil.createErrorResponse(validation));
+                com.shared.common.util.SecurePaginationUtil.createErrorResponse(validation));
         }
         try {
             // Only use nextPageToken and filters for cursor-based pagination

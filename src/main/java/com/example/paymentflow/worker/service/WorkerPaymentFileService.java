@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.example.paymentflow.utilities.file.FileStorageUtil;
 import com.example.paymentflow.utilities.file.UploadedFile;
 import com.example.paymentflow.utilities.file.UploadedFileRepository;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider;
+import com.shared.utilities.logger.LoggerFactoryProvider;
 import com.example.paymentflow.worker.entity.WorkerPayment;
 import com.example.paymentflow.worker.entity.WorkerPaymentReceipt;
 import org.slf4j.Logger;

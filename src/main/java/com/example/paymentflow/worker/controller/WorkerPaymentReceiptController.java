@@ -8,15 +8,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
 import jakarta.servlet.http.HttpServletRequest;
-import com.example.paymentflow.common.util.ETagUtil;
+import com.shared.common.util.ETagUtil;
 import org.springframework.web.bind.annotation.*;
-import com.example.paymentflow.audit.annotation.Audited;
+import com.shared.audit.annotation.Audited;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider;
+import com.shared.utilities.logger.LoggerFactoryProvider;
 
 import java.util.Map;
 
@@ -51,24 +51,24 @@ public class WorkerPaymentReceiptController {
     @PostMapping("/all/secure")
     @Operation(summary = "Get all worker receipts with secure pagination and filtering", 
                description = "Returns paginated worker receipts with optional status filter and secure pagination (mandatory date range, opaque tokens)")
-    @com.example.paymentflow.common.annotation.SecurePagination
+    @com.shared.common.annotation.SecurePagination
     public ResponseEntity<?> getAllWorkerReceiptsSecure(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Secure pagination request with mandatory date range",
                 required = true
             )
             @jakarta.validation.Valid @RequestBody 
-            com.example.paymentflow.common.dto.SecurePaginationRequest request,
+            com.shared.common.dto.SecurePaginationRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
         log.info("Fetching worker receipts with secure pagination, status: {}, request: {}", request.getStatus(), request);
         try {
             // Apply pageToken if present
-            com.example.paymentflow.common.util.SecurePaginationUtil.applyPageToken(request);
-            com.example.paymentflow.common.util.SecurePaginationUtil.ValidationResult validation = 
-                com.example.paymentflow.common.util.SecurePaginationUtil.validatePaginationRequest(request);
+            com.shared.common.util.SecurePaginationUtil.applyPageToken(request);
+            com.shared.common.util.SecurePaginationUtil.ValidationResult validation = 
+                com.shared.common.util.SecurePaginationUtil.validatePaginationRequest(request);
             if (!validation.isValid()) {
                 return ResponseEntity.badRequest().body(
-                    com.example.paymentflow.common.util.SecurePaginationUtil.createErrorResponse(validation));
+                    com.shared.common.util.SecurePaginationUtil.createErrorResponse(validation));
             }
             // Use only nextPageToken and filters for cursor-based pagination
             String nextPageToken = request.getPageToken();
@@ -79,12 +79,12 @@ public class WorkerPaymentReceiptController {
             } else {
                 receiptsPage = service.findByDateRangeWithToken(validation.getStartDateTime(), validation.getEndDateTime(), nextPageToken);
             }
-            com.example.paymentflow.common.dto.SecurePaginationResponse<WorkerPaymentReceipt> response = 
-                com.example.paymentflow.common.util.SecurePaginationUtil.createSecureResponse(receiptsPage, request);
+            com.shared.common.dto.SecurePaginationResponse<WorkerPaymentReceipt> response = 
+                com.shared.common.util.SecurePaginationUtil.createSecureResponse(receiptsPage, request);
             com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
             objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
             String responseJson = objectMapper.writeValueAsString(response);
-            String eTag = com.example.paymentflow.common.util.ETagUtil.generateETag(responseJson);
+            String eTag = com.shared.common.util.ETagUtil.generateETag(responseJson);
             String ifNoneMatch = httpRequest.getHeader(org.springframework.http.HttpHeaders.IF_NONE_MATCH);
             if (eTag.equals(ifNoneMatch)) {
                 return ResponseEntity.status(304).eTag(eTag).build();

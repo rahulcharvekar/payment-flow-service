@@ -11,7 +11,7 @@ import com.example.paymentflow.worker.service.WorkerPaymentService;
 import com.example.paymentflow.board.service.BoardReceiptService;
 import com.example.paymentflow.board.entity.BoardReceipt;
 import org.slf4j.Logger;
-import com.example.paymentflow.utilities.logger.LoggerFactoryProvider;
+import com.shared.utilities.logger.LoggerFactoryProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
