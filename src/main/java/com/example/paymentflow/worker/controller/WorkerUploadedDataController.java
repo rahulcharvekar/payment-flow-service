@@ -18,7 +18,6 @@ import com.shared.utilities.logger.LoggerFactoryProvider;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import com.shared.audit.annotation.Audited;
 import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,6 +28,7 @@ import org.slf4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
+import com.shared.utilities.AuditHelper;
 
 @RestController
 @RequestMapping("/api/worker/uploaded-data")
@@ -39,12 +39,14 @@ public class WorkerUploadedDataController {
     private static final Logger log = LoggerFactoryProvider.getLogger(WorkerUploadedDataController.class);
     
     private final WorkerUploadedDataService service;
+    private final AuditHelper auditHelper;
     
     @Autowired
     private WorkerPaymentFileService fileService;
 
-    public WorkerUploadedDataController(WorkerUploadedDataService service) {
+    public WorkerUploadedDataController(WorkerUploadedDataService service, AuditHelper auditHelper) {
         this.service = service;
+        this.auditHelper = auditHelper;
     }
 
     // NEW: Secure paginated endpoint with mandatory date range filtering
@@ -104,7 +106,6 @@ public class WorkerUploadedDataController {
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Audited(action = "UPLOAD_WORKER_PAYMENT_FILE", resourceType = "WORKER_UPLOADED_DATA")
     @Operation(summary = "Upload worker payment file", 
                description = "Upload CSV, XLS, or XLSX file containing worker payment data. Returns fileId for subsequent operations.")
     @com.shared.common.annotation.UiType(value = com.shared.common.util.UiTypes.UPLOAD, usage = "File upload button for worker payment data")
@@ -147,10 +148,15 @@ public class WorkerUploadedDataController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
             }
             
+            auditHelper.recordAudit("UPLOAD_WORKER_PAYMENT_FILE", "WORKER_UPLOADED_DATA", result.get("fileId").toString(), "SUCCESS", Map.of("filename", filename, "fileSize", file.getSize()));
+            
             return ResponseEntity.ok(result);
             
         } catch (Exception e) {
             log.error("File upload failed", e);
+            
+            auditHelper.recordAudit("UPLOAD_WORKER_PAYMENT_FILE", "WORKER_UPLOADED_DATA", null, "FAILURE", Map.of("filename", file.getOriginalFilename(), "error", e.getMessage()));
+            
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "status", "failed",
                 "error", "File upload failed: " + e.getMessage(),
@@ -200,7 +206,6 @@ public class WorkerUploadedDataController {
     }
 
     @PostMapping("/file/{fileId}/validate")
-    @Audited(action = "VALIDATE_UPLOADED_DATA", resourceType = "WORKER_UPLOADED_DATA")
     @Operation(summary = "Validate uploaded data", 
                description = "Validates all uploaded data for a specific file and updates uploaded file status")
     public ResponseEntity<?> validateUploadedData(
@@ -217,10 +222,15 @@ public class WorkerUploadedDataController {
                 return ResponseEntity.badRequest().body(result);
             }
             
+            auditHelper.recordAudit("VALIDATE_UPLOADED_DATA", "WORKER_UPLOADED_DATA", fileId, "SUCCESS", null);
+            
             return ResponseEntity.ok(result);
             
         } catch (Exception e) {
             log.error("Error validating uploaded data for fileId: {}", fileId, e);
+            
+            auditHelper.recordAudit("VALIDATE_UPLOADED_DATA", "WORKER_UPLOADED_DATA", fileId, "FAILURE", Map.of("error", e.getMessage()));
+            
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
@@ -275,7 +285,6 @@ public class WorkerUploadedDataController {
     }
 
     @PostMapping("/file/{fileId}/generate-request")
-    @Audited(action = "GENERATE_REQUEST_FOR_VALIDATED_DATA", resourceType = "WORKER_UPLOADED_DATA")
     @Operation(summary = "Generate request for validated data", 
                description = "Generates request numbers for validated data (keeps data in same table)")
     public ResponseEntity<?> generateRequestForValidatedData(
@@ -293,6 +302,8 @@ public class WorkerUploadedDataController {
             // Get updated summary
             Map<String, Integer> summary = service.getFileStatusSummary(fileId);
             
+            auditHelper.recordAudit("GENERATE_REQUEST_FOR_VALIDATED_DATA", "WORKER_UPLOADED_DATA", fileId, "SUCCESS", Map.of("processedRecords", processedCount));
+            
             return ResponseEntity.ok(Map.of(
                 "message", "Request generated successfully",
                 "fileId", fileId,
@@ -302,12 +313,14 @@ public class WorkerUploadedDataController {
             
         } catch (Exception e) {
             log.error("Error generating request for validated data in fileId: {}", fileId, e);
+            
+            auditHelper.recordAudit("GENERATE_REQUEST_FOR_VALIDATED_DATA", "WORKER_UPLOADED_DATA", fileId, "FAILURE", Map.of("error", e.getMessage()));
+            
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @DeleteMapping("/file/{fileId}")
-    @Audited(action = "DELETE_UPLOADED_DATA", resourceType = "WORKER_UPLOADED_DATA")
     @Operation(summary = "Delete uploaded data", 
                description = "Deletes all uploaded data for a specific file")
     public ResponseEntity<?> deleteUploadedData(
@@ -318,6 +331,8 @@ public class WorkerUploadedDataController {
         try {
             service.deleteByFileId(fileId);
             
+            auditHelper.recordAudit("DELETE_UPLOADED_DATA", "WORKER_UPLOADED_DATA", fileId, "SUCCESS", null);
+            
             return ResponseEntity.ok(Map.of(
                 "message", "Uploaded data deleted successfully",
                 "fileId", fileId
@@ -325,6 +340,9 @@ public class WorkerUploadedDataController {
             
         } catch (Exception e) {
             log.error("Error deleting uploaded data for fileId: {}", fileId, e);
+            
+            auditHelper.recordAudit("DELETE_UPLOADED_DATA", "WORKER_UPLOADED_DATA", fileId, "FAILURE", Map.of("error", e.getMessage()));
+            
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

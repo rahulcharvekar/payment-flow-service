@@ -11,7 +11,6 @@ import com.shared.common.util.ETagUtil;
 import org.slf4j.Logger;
 import com.shared.utilities.logger.LoggerFactoryProvider;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import com.shared.audit.annotation.Audited;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,6 +27,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.shared.common.annotation.Auditable;
 
 @RestController
 @RequestMapping("/api/v1/worker-payments")
@@ -46,11 +46,12 @@ public class WorkerPaymentController {
     }
 
     @PostMapping
-    @Audited(action = "CREATE_WORKER_PAYMENT", resourceType = "WORKER_PAYMENT")
+    @Auditable(action = "CREATE_WORKER_PAYMENT", resourceType = "WORKER_PAYMENT", resourceId = "#result.body.id")
     public ResponseEntity<WorkerPayment> create(@RequestBody WorkerPayment workerPayment) {
         log.info("Creating worker payment for workerRef={}", workerPayment.getWorkerRef());
         WorkerPayment created = service.create(workerPayment);
         log.info("Created worker payment id={}", created.getId());
+        
         return ResponseEntity.created(URI.create("/api/v1/worker-payments/" + created.getId()))
                 .body(created);
     }
@@ -120,17 +121,20 @@ public class WorkerPaymentController {
     }
 
     @PutMapping("/{id}")
-    @Audited(action = "UPDATE_WORKER_PAYMENT", resourceType = "WORKER_PAYMENT")
+    @Auditable(action = "UPDATE_WORKER_PAYMENT", resourceType = "WORKER_PAYMENT", resourceId = "#id")
     public ResponseEntity<WorkerPayment> update(@PathVariable("id") Long id, @RequestBody WorkerPayment workerPayment) {
         log.info("Updating worker payment id={}", id);
-        return ResponseEntity.ok(service.update(id, workerPayment));
+        WorkerPayment updated = service.update(id, workerPayment);
+        
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
-    @Audited(action = "DELETE_WORKER_PAYMENT", resourceType = "WORKER_PAYMENT")
+    @Auditable(action = "DELETE_WORKER_PAYMENT", resourceType = "WORKER_PAYMENT", resourceId = "#id")
     public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
         log.info("Deleting worker payment id={}", id);
         service.delete(id);
+        
         return ResponseEntity.noContent().build();
     }
 

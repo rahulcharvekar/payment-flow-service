@@ -1,6 +1,5 @@
 package com.example.paymentflow.board.controller;
 
-import com.shared.audit.annotation.Audited;
 import com.example.paymentflow.board.entity.BoardReceiptProcessRequest;
 
 import com.example.paymentflow.board.entity.BoardReceipt;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.Map;
+import com.shared.common.annotation.Auditable;
 
 @RestController
 @RequestMapping("/api/v1/board-receipts")
@@ -107,7 +107,7 @@ public class BoardReceiptController {
     @PostMapping("/process")
     @Operation(summary = "Process board receipt with UTR number", 
                description = "Processes a board receipt by adding UTR number and changing status to VERIFIED")
-    @Audited(action = "PROCESS_BOARD_RECEIPT", resourceType = "BOARD_RECEIPT")
+    @Auditable(action = "PROCESS_BOARD_RECEIPT", resourceType = "BOARD_RECEIPT", resourceId = "#request.boardRef")
     public ResponseEntity<?> processBoardReceipt(@RequestBody BoardReceiptProcessRequest request) {
         log.info("Processing board receipt: {} with UTR: {} by checker: {}", 
                 request.getBoardRef(), request.getUtrNumber(), request.getChecker());
@@ -132,22 +132,26 @@ public class BoardReceiptController {
             
         } catch (Exception e) {
             log.error("Error processing board receipt: {}", request.getBoardRef(), e);
+            
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @PutMapping("/{id}")
-    @Audited(action = "UPDATE_BOARD_RECEIPT", resourceType = "BOARD_RECEIPT")
+    @Auditable(action = "UPDATE_BOARD_RECEIPT", resourceType = "BOARD_RECEIPT", resourceId = "#id")
     public ResponseEntity<BoardReceipt> update(@PathVariable("id") Long id, @RequestBody BoardReceipt boardReceipt) {
         log.info("Updating board receipt id={}", id);
-        return ResponseEntity.ok(service.update(id, boardReceipt));
+        BoardReceipt updated = service.update(id, boardReceipt);
+        
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
-    @Audited(action = "DELETE_BOARD_RECEIPT", resourceType = "BOARD_RECEIPT")
+    @Auditable(action = "DELETE_BOARD_RECEIPT", resourceType = "BOARD_RECEIPT", resourceId = "#id")
     public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
         log.info("Deleting board receipt id={}", id);
         service.delete(id);
+        
         return ResponseEntity.noContent().build();
     }
 

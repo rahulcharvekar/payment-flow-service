@@ -1,7 +1,5 @@
 package com.example.paymentflow.employer.controller;
 
-import com.shared.audit.annotation.Audited;
-
 import com.example.paymentflow.employer.entity.EmployerPaymentReceipt;
 import com.example.paymentflow.employer.service.EmployerPaymentReceiptService;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +12,7 @@ import com.shared.utilities.logger.LoggerFactoryProvider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
+import com.shared.common.annotation.Auditable;
 
 @RestController
 @RequestMapping("/api/employer/receipts")
@@ -75,7 +74,7 @@ public class EmployerPaymentReceiptController {
     @PostMapping("/validate")
     @Operation(summary = "Validate worker receipt and create employer receipt", 
                description = "Validates a worker receipt with transaction reference and creates employer receipt")
-    @Audited(action = "VALIDATE_RECEIPT", resourceType = "EMPLOYER_PAYMENT_RECEIPT")
+    @Auditable(action = "VALIDATE_EMPLOYER_RECEIPT", resourceType = "EMPLOYER_PAYMENT_RECEIPT", resourceId = "#request.workerReceiptNumber")
     public ResponseEntity<?> validateReceipt(@RequestBody ReceiptValidationRequest request) {
         log.info("Validating worker receipt: {} with transaction reference: {}", 
                 request.getWorkerReceiptNumber(), request.getTransactionReference());
@@ -99,6 +98,7 @@ public class EmployerPaymentReceiptController {
             
         } catch (Exception e) {
             log.error("Error validating receipt: {}", request.getWorkerReceiptNumber(), e);
+            
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

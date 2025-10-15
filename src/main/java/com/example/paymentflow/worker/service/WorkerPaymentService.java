@@ -15,6 +15,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
+import com.shared.common.annotation.Auditable;
+
 @Service
 @Transactional
 public class WorkerPaymentService {
@@ -29,6 +31,7 @@ public class WorkerPaymentService {
         this.workerPaymentQueryDao = workerPaymentQueryDao;
     }
 
+    @Auditable(action = "CREATE_WORKER_PAYMENT", resourceType = "WORKER_PAYMENT", resourceId = "#result.id")
     public WorkerPayment create(WorkerPayment workerPayment) {
         log.info("Persisting worker payment for workerRef={}", workerPayment.getWorkerRef());
         WorkerPayment saved = repository.save(workerPayment);

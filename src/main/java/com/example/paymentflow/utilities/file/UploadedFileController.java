@@ -7,7 +7,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.shared.audit.annotation.Audited;
 import com.shared.utilities.logger.LoggerFactoryProvider;
 
 import org.slf4j.Logger;
@@ -22,6 +21,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 import java.util.Map;
+import com.shared.utilities.AuditHelper;
 
 @RestController
 @RequestMapping("/api/uploaded-files")
@@ -32,9 +32,11 @@ public class UploadedFileController {
     private static final Logger log = LoggerFactoryProvider.getLogger(UploadedFileController.class);
     
     private final UploadedFileService uploadedFileService;
+    private final AuditHelper auditHelper;
 
-    public UploadedFileController(UploadedFileService uploadedFileService) {
+    public UploadedFileController(UploadedFileService uploadedFileService, AuditHelper auditHelper) {
         this.uploadedFileService = uploadedFileService;
+        this.auditHelper = auditHelper;
     }
 
     @Operation(summary = "Get paginated uploaded files with secure date filtering", 
@@ -46,7 +48,6 @@ public class UploadedFileController {
         @ApiResponse(responseCode = "401", description = "Unauthorized access")
     })
     @PostMapping("/secure-paginated")
-    @Audited(action = "GET_SECURE_PAGINATED_FILES", resourceType = "UPLOADED_FILE")
     public ResponseEntity<?> getSecurePaginatedUploadedFiles(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Secure pagination request with mandatory date range",
@@ -96,7 +97,6 @@ public class UploadedFileController {
         @ApiResponse(responseCode = "500", description = "Error reading file")
     })
     @GetMapping("/{id}/download")
-    @Audited(action = "DOWNLOAD_UPLOADED_FILE", resourceType = "UPLOADED_FILE")
     public ResponseEntity<Resource> downloadFile(
             @Parameter(description = "ID of the file to download", required = true)
             @PathVariable Long id) {
@@ -107,6 +107,9 @@ public class UploadedFileController {
             String contentType = uploadedFileService.getContentType(id);
             UploadedFile fileMetadata = uploadedFileService.getUploadedFileById(id);
             
+            auditHelper.recordAudit("DOWNLOAD_UPLOADED_FILE", "UPLOADED_FILE", id.toString(), "SUCCESS", 
+                Map.of("filename", fileMetadata.getFilename()));
+            
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
                     .header(HttpHeaders.CONTENT_DISPOSITION, 
@@ -116,6 +119,10 @@ public class UploadedFileController {
                     
         } catch (Exception e) {
             log.error("Error downloading file with id: {}", id, e);
+            
+            auditHelper.recordAudit("DOWNLOAD_UPLOADED_FILE", "UPLOADED_FILE", id.toString(), "FAILURE", 
+                Map.of("error", e.getMessage()));
+            
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

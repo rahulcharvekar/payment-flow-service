@@ -10,37 +10,37 @@ public class UploadedFile {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "filename", nullable = false)
     private String filename;
 
-    @Column(nullable = false)
+    @Column(name = "stored_path", nullable = false, length = 500)
     private String storedPath;
 
-    @Column(nullable = false, length = 64)
+    @Column(name = "file_hash", nullable = false, length = 64)
     private String fileHash;
 
-    @Column(nullable = false)
+    @Column(name = "file_type", nullable = false, length = 50)
     private String fileType;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime uploadDate;
 
-    @Column(nullable = true)
+    @Column(name = "uploaded_by", nullable = true, length = 100)
     private String uploadedBy;
 
-    @Column(nullable = false)
+    @Column(name = "total_records", nullable = false)
     private Integer totalRecords = 0;
 
-    @Column(nullable = false)
+    @Column(name = "success_count", nullable = false)
     private Integer successCount = 0;
 
-    @Column(nullable = false)
+    @Column(name = "failure_count", nullable = false)
     private Integer failureCount = 0;
 
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false, length = 50)
     private String status;
 
-    @Column(name = "file_reference_number", nullable = true, unique = true)
+    @Column(name = "file_reference_number", nullable = true, unique = true, length = 100)
     private String fileReferenceNumber;
 
     public Long getId() {
