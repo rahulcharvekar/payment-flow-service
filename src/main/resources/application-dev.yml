@@ -32,20 +32,38 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] [%X{sessionToken}] [%X{X-Request-ID}] - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] [%X{sessionToken}] [%X{X-Request-ID}] - %msg%n"
 
-file:
-  upload:
-    base-dir: /Users/rahulcharvekar/Documents/Repos/ManpowerManagement/PaymentReconciliation/payment-flow-service/uploads/dev/
-
 management:
   endpoints:
     web:
       exposure:
         include: health,info,beans,env,metrics,loggers
 
-# Auditing toggle
-audit:
-  enabled: true
-  hashing-algorithm: SHA-256  # Optional: default is SHA-256
+# Audit Utility Configuration
+shared-lib:
+  audit:
+    enabled: true  # Set to true to enable audit logging
+    table-name: audit_event
+    hashing-algorithm: SHA-256
+    initial-hash-value: 0000000000000000000000000000000000000000000000000000000000000000
 
+  # SFTP Utility Configuration
+  sftp:
+    enabled: false  # Set to true to enable SFTP operations
+    host: localhost
+    port: 22
+    username: user
+    password: password
+    remote-directory: /incoming
+    local-directory: /tmp/sftp
+    known-hosts-file: ~/.ssh/known_hosts
+    strict-host-key-checking: true
+  security:
+    enabled: true
+    permitted-paths: /actuator/**,/v3/api-docs/**,/swagger-ui/**,/swagger-ui.html  # Optional, defaults provided
+  filters:
+    enabled: true 
+  file-upload:
+    enabled: true
+    base-dir: /Users/rahulcharvekar/Documents/Repos/LBE/PaymentReconciliation/payment-flow-service/uploads/dev/ 
 server:
   port: 8081

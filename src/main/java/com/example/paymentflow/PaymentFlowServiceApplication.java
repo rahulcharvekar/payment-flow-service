@@ -4,9 +4,12 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
+import com.shared.security.EnableSharedSecurity;
 
-@SpringBootApplication(scanBasePackages = {"com.example.paymentflow", "com.shared"})
+
+@SpringBootApplication
 @EnableAspectJAutoProxy
+@EnableSharedSecurity
 public class PaymentFlowServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(PaymentFlowServiceApplication.class, args);

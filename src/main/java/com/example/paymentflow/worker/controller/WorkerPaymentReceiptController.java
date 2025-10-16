@@ -18,7 +18,7 @@ import org.slf4j.Logger;
 import com.shared.utilities.logger.LoggerFactoryProvider;
 
 import java.util.Map;
-import com.shared.utilities.AuditHelper;
+import com.shared.audit.AuditHelper;
 
 @RestController
 @RequestMapping("/api/worker/receipts")

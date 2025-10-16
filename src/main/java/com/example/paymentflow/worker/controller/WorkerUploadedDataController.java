@@ -28,7 +28,7 @@ import org.slf4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
-import com.shared.utilities.AuditHelper;
+import com.shared.audit.AuditHelper;
 
 @RestController
 @RequestMapping("/api/worker/uploaded-data")
