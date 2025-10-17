@@ -21,7 +21,7 @@ ENV APP_HOME=/app \
 	TZ=UTC \
 	LANG=C.UTF-8 \
 	FILE_UPLOAD_DIR=/tmp/uploads \
-	LOG_FILE=/tmp/logs/payment-flow-service.log
+	LOG_FILE=/tmp/logs/payment-reconciliation.log
 WORKDIR ${APP_HOME}
 RUN mkdir -p /tmp/uploads /tmp/logs && \
 	chown -R appuser:appuser /tmp/uploads /tmp/logs && \

@@ -3,3 +3,23 @@ target/
 *.iml
 .idea/
 .DS_Store
+logs/
+*.class
+*.jar
+.vscode/
+
+# Docker
+.dockerignore
+Dockerfile*
+docker-compose*.yml
+.env
+.env.local
+.env.*.local
+
+# IDE
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db

@@ -1,5 +1,9 @@
 target/
-.git
-.idea
-*.iml
 *.log
+*.iml
+.idea/
+.DS_Store
+logs/
+*.class
+*.jar
+.vscode/

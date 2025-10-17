@@ -82,7 +82,10 @@ public class WorkerPaymentReceiptQueryDao {
         @Override
         public WorkerPaymentReceipt mapRow(ResultSet rs, int rowNum) throws SQLException {
             WorkerPaymentReceipt receipt = new WorkerPaymentReceipt();
-            // Note: WorkerPaymentReceipt doesn't have setId method, id is auto-generated
+            Long id = rs.getObject("id", Long.class);
+            if (id != null) {
+                receipt.setId(id);
+            }
             receipt.setReceiptNumber(rs.getString("receipt_number"));
             receipt.setEmployerId(rs.getString("employer_id"));
             receipt.setToliId(rs.getString("toli_id"));

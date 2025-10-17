@@ -39,6 +39,10 @@ public class WorkerPaymentReceipt {
         return id;
     }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public String getReceiptNumber() {
         return receiptNumber;
     }

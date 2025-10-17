@@ -165,10 +165,10 @@ public class WorkerPaymentQueryDao extends BaseQueryDao {
         String sql = """
             SELECT 
                 COUNT(*) as total_payments,
-                SUM(amount) as total_amount,
-                AVG(amount) as average_amount,
-                MIN(amount) as min_amount,
-                MAX(amount) as max_amount,
+                SUM(payment_amount) as total_amount,
+                AVG(payment_amount) as average_amount,
+                MIN(payment_amount) as min_amount,
+                MAX(payment_amount) as max_amount,
                 COUNT(DISTINCT status) as status_count
             FROM worker_payments 
             WHERE file_id = :fileId
@@ -185,6 +185,10 @@ public class WorkerPaymentQueryDao extends BaseQueryDao {
         WorkerPayment payment = new WorkerPayment();
         
         // Map all fields according to the entity structure
+        Long id = rs.getObject("id", Long.class);
+        if (id != null) {
+            payment.setId(id);
+        }
         payment.setWorkerRef(rs.getString("worker_reference"));
         payment.setRegId(rs.getString("registration_id"));
         payment.setName(rs.getString("worker_name"));

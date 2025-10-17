@@ -41,7 +41,7 @@ public class BoardReceiptQueryDao {
         return jdbcTemplate.query(sql, new BoardReceiptRowMapper(), status);
     }
     
-    public List<BoardReceipt> findByBoardId(Long boardId) {
+    public List<BoardReceipt> findByBoardId(String boardId) {
         String sql = BASE_SELECT + " WHERE br.board_id = ? ORDER BY br.created_at DESC";
         return jdbcTemplate.query(sql, new BoardReceiptRowMapper(), boardId);
     }
@@ -137,7 +137,10 @@ public class BoardReceiptQueryDao {
         @Override
         public BoardReceipt mapRow(ResultSet rs, int rowNum) throws SQLException {
             BoardReceipt receipt = new BoardReceipt();
-            // Note: BoardReceipt doesn't have a setId method, id is auto-generated
+            Long id = rs.getObject("id", Long.class);
+            if (id != null) {
+                receipt.setId(id);
+            }
             receipt.setBoardId(rs.getString("board_id"));
             receipt.setBoardRef(rs.getString("board_reference"));
             receipt.setEmployerRef(rs.getString("employer_reference"));
