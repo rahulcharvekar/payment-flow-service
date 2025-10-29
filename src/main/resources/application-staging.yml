@@ -36,6 +36,26 @@ management:
       exposure:
         include: health,info,metrics,env
 
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    issuer: user-auth-service
+    audience: payment-services
+    expiration: 86400
+
+shared-lib:
+  security:
+    enabled: true
+    permitted-paths:
+      - /actuator/**
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+    introspection:
+      url: ${AUTH_SERVICE_BASE_URL:http://auth-service.payment-recon.svc.cluster.local:8080}/internal/auth/introspect
+      api-key: ${INTERNAL_API_KEY:}
+      api-key-header: X-Internal-Api-Key
+
 # Auditing toggle
 auditing:
   enabled: true

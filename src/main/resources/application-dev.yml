@@ -17,8 +17,8 @@ spring:
 app:
   jwt:
     secret: "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
-    issuer: payment-reconciliation-service
-    audience: payment-reconciliation-api
+    issuer: user-auth-service
+    audience: payment-services
     expiration: 86400
 
 logging:
@@ -59,7 +59,15 @@ shared-lib:
     strict-host-key-checking: true
   security:
     enabled: true
-    permitted-paths: /actuator/**,/v3/api-docs/**,/swagger-ui/**,/swagger-ui.html  # Optional, defaults provided
+    permitted-paths:
+      - /actuator/**
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+    introspection:
+      url: http://localhost:8080/internal/auth/introspect
+      api-key: ${INTERNAL_API_KEY:}
+      api-key-header: X-Internal-Api-Key
   filters:
     enabled: true 
   file-upload:

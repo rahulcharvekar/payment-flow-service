@@ -1,8 +1,11 @@
 package com.example.paymentflow.master.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
-import java.time.LocalDate;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,57 +22,90 @@ public class WorkerMaster {
     @Column(name = "worker_reference", nullable = false, unique = true, length = 64)
     private String workerReference;
 
-    @Column(name = "registration_id", nullable = false, unique = true, length = 64)
-    private String registrationId;
+    @Column(name = "registration_no", nullable = false, unique = true, length = 64)
+    private String registrationNo;
+
+    @Column(name = "serial_no", unique = true, length = 64)
+    private String serialNo;
+
+    @Column(name = "labor_name_english", length = 255)
+    private String laborNameEnglish;
+
+    @Column(name = "labor_address_1", length = 255)
+    private String laborAddress1;
+
+    @Column(name = "labor_address_2", length = 255)
+    private String laborAddress2;
+
+    @Column(name = "permanent_address_3", length = 255)
+    private String permanentAddress3;
+
+    @Column(name = "age")
+    private Integer age;
+
+    @Column(name = "marital_status", length = 30)
+    private String maritalStatus;
+
+    @Column(name = "receipt_no", length = 64)
+    private String receiptNo;
+
+    @Column(name = "receipt_amount", precision = 15, scale = 2)
+    @DecimalMin(value = "0.0", inclusive = false, message = "Receipt amount must be greater than 0")
+    private BigDecimal receiptAmount;
+
+    @Column(name = "nationality", length = 100)
+    private String nationality;
 
     @Column(name = "worker_name", nullable = false, length = 120)
     @NotBlank(message = "Worker name is required")
     @Size(max = 120, message = "Worker name cannot exceed 120 characters")
     private String workerName;
 
-    @Column(name = "father_name", length = 120)
-    private String fatherName;
+    @Column(name = "employer_name", length = 120)
+    private String employerName;
 
-    @Column(name = "date_of_birth")
-    private LocalDate dateOfBirth;
+    @Column(name = "employer_address", length = 255)
+    private String employerAddress;
 
-    @Column(name = "gender", length = 10)
-    private String gender;
+    @Column(name = "worker_address", length = 255)
+    private String workerAddress;
 
-    @Column(name = "aadhar", nullable = false, unique = true, length = 16)
+    @Column(name = "labor_name_marathi", length = 120)
+    private String laborNameMarathi;
+
+    @Column(name = "mother_name", length = 120)
+    private String motherName;
+
+    @Column(name = "aadhaar_number", nullable = false, unique = true, length = 12)
     @NotBlank(message = "Aadhaar number is required")
     @Pattern(regexp = "^[0-9]{12}$", message = "Aadhaar number must be 12 digits")
-    private String aadhar;
+    private String aadhaarNumber;
 
-    @Column(name = "pan", length = 16)
+    @Column(name = "pan_number", length = 16)
     @Pattern(regexp = "^[A-Z]{5}[0-9]{4}[A-Z]{1}$", message = "PAN number format is invalid")
-    private String pan;
+    private String panNumber;
 
-    @Column(name = "bank_account", length = 34)
-    private String bankAccount;
+    @Column(name = "mobile_number", length = 15)
+    @Pattern(regexp = "^[0-9]{10}$", message = "Mobile number must be 10 digits")
+    private String mobileNumber;
 
-    @Column(name = "bank_name", length = 100)
-    private String bankName;
+    @Column(name = "phone1", length = 15)
+    private String phone1;
 
-    @Column(name = "ifsc_code", length = 20)
-    private String ifscCode;
+    @Column(name = "phone2", length = 15)
+    private String phone2;
 
-    @Column(name = "phone_number", length = 15)
-    @Pattern(regexp = "^[0-9]{10}$", message = "Phone number must be 10 digits")
-    private String phoneNumber;
+    @Column(name = "witness_name_1", length = 120)
+    private String witnessName1;
 
-    @Column(name = "email", length = 100)
-    @Email(message = "Email format is invalid")
-    private String email;
+    @Column(name = "witness_name_2", length = 120)
+    private String witnessName2;
 
-    @Column(name = "address", columnDefinition = "TEXT")
-    private String address;
+    @Column(name = "witness_designation", length = 120)
+    private String witnessDesignation;
 
-    @Column(name = "emergency_contact_name", length = 100)
-    private String emergencyContactName;
-
-    @Column(name = "emergency_contact_phone", length = 15)
-    private String emergencyContactPhone;
+    @Column(name = "labor_union_address", length = 255)
+    private String laborUnionAddress;
 
     @Column(name = "status", nullable = false, length = 32)
     private String status = "ACTIVE";
@@ -123,12 +159,92 @@ public class WorkerMaster {
         this.workerReference = workerReference;
     }
 
-    public String getRegistrationId() {
-        return registrationId;
+    public String getRegistrationNo() {
+        return registrationNo;
     }
 
-    public void setRegistrationId(String registrationId) {
-        this.registrationId = registrationId;
+    public void setRegistrationNo(String registrationNo) {
+        this.registrationNo = registrationNo;
+    }
+
+    public String getSerialNo() {
+        return serialNo;
+    }
+
+    public void setSerialNo(String serialNo) {
+        this.serialNo = serialNo;
+    }
+
+    public String getLaborNameEnglish() {
+        return laborNameEnglish;
+    }
+
+    public void setLaborNameEnglish(String laborNameEnglish) {
+        this.laborNameEnglish = laborNameEnglish;
+    }
+
+    public String getLaborAddress1() {
+        return laborAddress1;
+    }
+
+    public void setLaborAddress1(String laborAddress1) {
+        this.laborAddress1 = laborAddress1;
+    }
+
+    public String getLaborAddress2() {
+        return laborAddress2;
+    }
+
+    public void setLaborAddress2(String laborAddress2) {
+        this.laborAddress2 = laborAddress2;
+    }
+
+    public String getPermanentAddress3() {
+        return permanentAddress3;
+    }
+
+    public void setPermanentAddress3(String permanentAddress3) {
+        this.permanentAddress3 = permanentAddress3;
+    }
+
+    public Integer getAge() {
+        return age;
+    }
+
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+
+    public String getMaritalStatus() {
+        return maritalStatus;
+    }
+
+    public void setMaritalStatus(String maritalStatus) {
+        this.maritalStatus = maritalStatus;
+    }
+
+    public String getReceiptNo() {
+        return receiptNo;
+    }
+
+    public void setReceiptNo(String receiptNo) {
+        this.receiptNo = receiptNo;
+    }
+
+    public BigDecimal getReceiptAmount() {
+        return receiptAmount;
+    }
+
+    public void setReceiptAmount(BigDecimal receiptAmount) {
+        this.receiptAmount = receiptAmount;
+    }
+
+    public String getNationality() {
+        return nationality;
+    }
+
+    public void setNationality(String nationality) {
+        this.nationality = nationality;
     }
 
     public String getWorkerName() {
@@ -139,108 +255,116 @@ public class WorkerMaster {
         this.workerName = workerName;
     }
 
-    public String getFatherName() {
-        return fatherName;
+    public String getEmployerName() {
+        return employerName;
     }
 
-    public void setFatherName(String fatherName) {
-        this.fatherName = fatherName;
+    public void setEmployerName(String employerName) {
+        this.employerName = employerName;
     }
 
-    public LocalDate getDateOfBirth() {
-        return dateOfBirth;
+    public String getEmployerAddress() {
+        return employerAddress;
     }
 
-    public void setDateOfBirth(LocalDate dateOfBirth) {
-        this.dateOfBirth = dateOfBirth;
+    public void setEmployerAddress(String employerAddress) {
+        this.employerAddress = employerAddress;
     }
 
-    public String getGender() {
-        return gender;
+    public String getWorkerAddress() {
+        return workerAddress;
     }
 
-    public void setGender(String gender) {
-        this.gender = gender;
+    public void setWorkerAddress(String workerAddress) {
+        this.workerAddress = workerAddress;
     }
 
-    public String getAadhar() {
-        return aadhar;
+    public String getLaborNameMarathi() {
+        return laborNameMarathi;
     }
 
-    public void setAadhar(String aadhar) {
-        this.aadhar = aadhar;
+    public void setLaborNameMarathi(String laborNameMarathi) {
+        this.laborNameMarathi = laborNameMarathi;
     }
 
-    public String getPan() {
-        return pan;
+    public String getMotherName() {
+        return motherName;
     }
 
-    public void setPan(String pan) {
-        this.pan = pan;
+    public void setMotherName(String motherName) {
+        this.motherName = motherName;
     }
 
-    public String getBankAccount() {
-        return bankAccount;
+    public String getAadhaarNumber() {
+        return aadhaarNumber;
     }
 
-    public void setBankAccount(String bankAccount) {
-        this.bankAccount = bankAccount;
+    public void setAadhaarNumber(String aadhaarNumber) {
+        this.aadhaarNumber = aadhaarNumber;
     }
 
-    public String getBankName() {
-        return bankName;
+    public String getPanNumber() {
+        return panNumber;
     }
 
-    public void setBankName(String bankName) {
-        this.bankName = bankName;
+    public void setPanNumber(String panNumber) {
+        this.panNumber = panNumber;
     }
 
-    public String getIfscCode() {
-        return ifscCode;
+    public String getMobileNumber() {
+        return mobileNumber;
     }
 
-    public void setIfscCode(String ifscCode) {
-        this.ifscCode = ifscCode;
+    public void setMobileNumber(String mobileNumber) {
+        this.mobileNumber = mobileNumber;
     }
 
-    public String getPhoneNumber() {
-        return phoneNumber;
+    public String getPhone1() {
+        return phone1;
     }
 
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
+    public void setPhone1(String phone1) {
+        this.phone1 = phone1;
     }
 
-    public String getEmail() {
-        return email;
+    public String getPhone2() {
+        return phone2;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
+    public void setPhone2(String phone2) {
+        this.phone2 = phone2;
     }
 
-    public String getAddress() {
-        return address;
+    public String getWitnessName1() {
+        return witnessName1;
     }
 
-    public void setAddress(String address) {
-        this.address = address;
+    public void setWitnessName1(String witnessName1) {
+        this.witnessName1 = witnessName1;
     }
 
-    public String getEmergencyContactName() {
-        return emergencyContactName;
+    public String getWitnessName2() {
+        return witnessName2;
     }
 
-    public void setEmergencyContactName(String emergencyContactName) {
-        this.emergencyContactName = emergencyContactName;
+    public void setWitnessName2(String witnessName2) {
+        this.witnessName2 = witnessName2;
     }
 
-    public String getEmergencyContactPhone() {
-        return emergencyContactPhone;
+    public String getWitnessDesignation() {
+        return witnessDesignation;
     }
 
-    public void setEmergencyContactPhone(String emergencyContactPhone) {
-        this.emergencyContactPhone = emergencyContactPhone;
+    public void setWitnessDesignation(String witnessDesignation) {
+        this.witnessDesignation = witnessDesignation;
+    }
+
+    public String getLaborUnionAddress() {
+        return laborUnionAddress;
+    }
+
+    public void setLaborUnionAddress(String laborUnionAddress) {
+        this.laborUnionAddress = laborUnionAddress;
     }
 
     public String getStatus() {
@@ -265,5 +389,69 @@ public class WorkerMaster {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    /**
+     * Backwards compatible getter for legacy naming.
+     */
+    @Deprecated(forRemoval = false)
+    public String getRegistrationId() {
+        return registrationNo;
+    }
+
+    /**
+     * Backwards compatible setter for legacy naming.
+     */
+    @Deprecated(forRemoval = false)
+    public void setRegistrationId(String registrationId) {
+        this.registrationNo = registrationId;
+    }
+
+    /**
+     * Backwards compatible getter for legacy naming.
+     */
+    @Deprecated(forRemoval = false)
+    public String getAadhar() {
+        return aadhaarNumber;
+    }
+
+    /**
+     * Backwards compatible setter for legacy naming.
+     */
+    @Deprecated(forRemoval = false)
+    public void setAadhar(String aadhar) {
+        this.aadhaarNumber = aadhar;
+    }
+
+    /**
+     * Backwards compatible getter for legacy naming.
+     */
+    @Deprecated(forRemoval = false)
+    public String getEstablishmentName() {
+        return laborNameEnglish;
+    }
+
+    /**
+     * Backwards compatible setter for legacy naming.
+     */
+    @Deprecated(forRemoval = false)
+    public void setEstablishmentName(String establishmentName) {
+        this.laborNameEnglish = establishmentName;
+    }
+
+    /**
+     * Backwards compatible getter for legacy naming.
+     */
+    @Deprecated(forRemoval = false)
+    public String getLaborOfficeName() {
+        return laborNameMarathi;
+    }
+
+    /**
+     * Backwards compatible setter for legacy naming.
+     */
+    @Deprecated(forRemoval = false)
+    public void setLaborOfficeName(String laborOfficeName) {
+        this.laborNameMarathi = laborOfficeName;
     }
 }
