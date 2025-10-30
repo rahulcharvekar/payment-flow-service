@@ -118,6 +118,15 @@ flowchart LR
   EP -->|notify employer| EM[Employer system reviews]
 ```
 
+Fallback (plain text) - readable in viewers that don't render Mermaid:
+
+```
+WorkerPayments pool --service--> Create WorkerPaymentReceipt
+Create WorkerPaymentReceipt --POST /api/worker/receipts/{receiptNumber}/send-to-employer--> Set status PAYMENT_INITIATED
+Set status PAYMENT_INITIATED --> Create EmployerPaymentReceipt (PENDING)
+Create EmployerPaymentReceipt (PENDING) --notify employer--> Employer system reviews
+```
+
 Example sequence:
 - Worker payments get processed by internal logic (service call WorkerPaymentReceiptService#createReceipt).
 - To send a created receipt to employer:
