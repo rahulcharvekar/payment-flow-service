@@ -1,5 +1,8 @@
 package com.example.paymentflow.master.entity;
 
+import com.shared.entityaudit.annotation.EntityAuditEnabled;
+import com.shared.entityaudit.descriptor.AbstractAuditableEntity;
+import com.shared.entityaudit.listener.SharedEntityAuditListener;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -7,10 +10,13 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
+@EntityAuditEnabled
+@EntityListeners(SharedEntityAuditListener.class)
 @Table(name = "worker_master")
-public class WorkerMaster {
+public class WorkerMaster extends AbstractAuditableEntity<Long> {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -453,5 +459,48 @@ public class WorkerMaster {
     @Deprecated(forRemoval = false)
     public void setLaborOfficeName(String laborOfficeName) {
         this.laborNameMarathi = laborOfficeName;
+    }
+
+    @Override
+    public String entityType() {
+        return "WORKER_MASTER";
+    }
+
+    @Override
+    public Map<String, Object> auditState() {
+        return auditStateOf(
+                "id", id,
+                "workerId", workerId,
+                "workerReference", workerReference,
+                "registrationNo", registrationNo,
+                "serialNo", serialNo,
+                "laborNameEnglish", laborNameEnglish,
+                "laborAddress1", laborAddress1,
+                "laborAddress2", laborAddress2,
+                "permanentAddress3", permanentAddress3,
+                "age", age,
+                "maritalStatus", maritalStatus,
+                "receiptNo", receiptNo,
+                "receiptAmount", receiptAmount != null ? receiptAmount.toPlainString() : null,
+                "nationality", nationality,
+                "workerName", workerName,
+                "employerName", employerName,
+                "employerAddress", employerAddress,
+                "workerAddress", workerAddress,
+                "laborNameMarathi", laborNameMarathi,
+                "motherName", motherName,
+                "aadhaarNumber", aadhaarNumber,
+                "panNumber", panNumber,
+                "mobileNumber", mobileNumber,
+                "phone1", phone1,
+                "phone2", phone2,
+                "witnessName1", witnessName1,
+                "witnessName2", witnessName2,
+                "witnessDesignation", witnessDesignation,
+                "laborUnionAddress", laborUnionAddress,
+                "status", status,
+                "createdAt", createdAt != null ? createdAt.toString() : null,
+                "updatedAt", updatedAt != null ? updatedAt.toString() : null
+        );
     }
 }

@@ -18,7 +18,6 @@ import org.slf4j.Logger;
 import com.shared.utilities.logger.LoggerFactoryProvider;
 
 import java.util.Map;
-import com.shared.audit.AuditHelper;
 
 @RestController
 @RequestMapping("/api/worker/receipts")
@@ -29,7 +28,6 @@ public class WorkerPaymentReceiptController {
     private static final Logger log = LoggerFactoryProvider.getLogger(WorkerPaymentReceiptController.class);
     
     private final WorkerPaymentReceiptService service;
-    private final AuditHelper auditHelper;
     
     @Autowired
     private EmployerPaymentReceiptService employerReceiptService;
@@ -37,9 +35,8 @@ public class WorkerPaymentReceiptController {
     @Autowired
     private WorkerPaymentService workerPaymentService;
 
-    public WorkerPaymentReceiptController(WorkerPaymentReceiptService service, AuditHelper auditHelper) {
+    public WorkerPaymentReceiptController(WorkerPaymentReceiptService service) {
         this.service = service;
-        this.auditHelper = auditHelper;
     }
 
 
@@ -178,10 +175,6 @@ public class WorkerPaymentReceiptController {
                 updatedPayments++;
             }
             log.info("Updated {} worker payment records to PAYMENT_INITIATED for receipt {}", updatedPayments, receiptNumber);
-            
-            auditHelper.recordAudit("SEND_RECEIPT_TO_EMPLOYER", "WORKER_PAYMENT_RECEIPT", receiptNumber, "SUCCESS", 
-                Map.of("employerReceiptNumber", employerReceipt.getEmployerReceiptNumber(), "updatedPayments", updatedPayments));
-            
             return ResponseEntity.ok(Map.of(
                 "message", "Worker receipt sent to employer successfully",
                 "workerReceiptNumber", receiptNumber,
@@ -195,9 +188,6 @@ public class WorkerPaymentReceiptController {
             
         } catch (Exception e) {
             log.error("Error sending worker receipt {} to employer", receiptNumber, e);
-            
-            auditHelper.recordAudit("SEND_RECEIPT_TO_EMPLOYER", "WORKER_PAYMENT_RECEIPT", receiptNumber, "FAILURE", 
-                Map.of("error", e.getMessage()));
             
             return ResponseEntity.badRequest().body(Map.of(
                 "error", "Failed to send receipt to employer: " + e.getMessage(),

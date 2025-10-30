@@ -1,12 +1,18 @@
 package com.example.paymentflow.employer.entity;
 
+import com.shared.entityaudit.annotation.EntityAuditEnabled;
+import com.shared.entityaudit.descriptor.AbstractAuditableEntity;
+import com.shared.entityaudit.listener.SharedEntityAuditListener;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
+@EntityAuditEnabled
+@EntityListeners(SharedEntityAuditListener.class)
 @Table(name = "employer_payment_receipts")
-public class EmployerPaymentReceipt {
+public class EmployerPaymentReceipt extends AbstractAuditableEntity<Long> {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -128,5 +134,27 @@ public class EmployerPaymentReceipt {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    @Override
+    public String entityType() {
+        return "EMPLOYER_PAYMENT_RECEIPT";
+    }
+
+    @Override
+    public Map<String, Object> auditState() {
+        return auditStateOf(
+                "id", id,
+                "employerReceiptNumber", employerReceiptNumber,
+                "workerReceiptNumber", workerReceiptNumber,
+                "employerId", employerId,
+                "toliId", toliId,
+                "transactionReference", transactionReference,
+                "validatedBy", validatedBy,
+                "validatedAt", validatedAt != null ? validatedAt.toString() : null,
+                "totalRecords", totalRecords,
+                "totalAmount", totalAmount != null ? totalAmount.toPlainString() : null,
+                "status", status
+        );
     }
 }

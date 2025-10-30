@@ -1,11 +1,17 @@
 package com.example.paymentflow.master.entity;
 
+import com.shared.entityaudit.annotation.EntityAuditEnabled;
+import com.shared.entityaudit.descriptor.AbstractAuditableEntity;
+import com.shared.entityaudit.listener.SharedEntityAuditListener;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
+@EntityAuditEnabled
+@EntityListeners(SharedEntityAuditListener.class)
 @Table(name = "employer_toli_relation")
-public class EmployerToliRelation {
+public class EmployerToliRelation extends AbstractAuditableEntity<Long> {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -146,5 +152,27 @@ public class EmployerToliRelation {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    @Override
+    public String entityType() {
+        return "EMPLOYER_TOLI_RELATION";
+    }
+
+    @Override
+    public Map<String, Object> auditState() {
+        return auditStateOf(
+                "id", id,
+                "employerId", employerId,
+                "toliId", toliId,
+                "toliName", toliName,
+                "toliCode", toliCode,
+                "location", location,
+                "supervisorName", supervisorName,
+                "supervisorContact", supervisorContact,
+                "status", status,
+                "createdAt", createdAt != null ? createdAt.toString() : null,
+                "updatedAt", updatedAt != null ? updatedAt.toString() : null
+        );
     }
 }

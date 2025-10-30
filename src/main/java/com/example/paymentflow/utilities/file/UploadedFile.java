@@ -115,4 +115,5 @@ public class UploadedFile {
     public void setFileReferenceNumber(String fileReferenceNumber) {
         this.fileReferenceNumber = fileReferenceNumber;
     }
+
 }

@@ -1,17 +1,25 @@
 package com.example.paymentflow.board.entity;
 
+import com.shared.entityaudit.annotation.EntityAuditEnabled;
+import com.shared.entityaudit.descriptor.AbstractAuditableEntity;
+import com.shared.entityaudit.listener.SharedEntityAuditListener;
+import com.shared.entityaudit.model.EntityAuditAction;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 
 @Entity
+@EntityAuditEnabled
+@EntityListeners(SharedEntityAuditListener.class)
 @Table(name = "board_receipts")
-public class BoardReceipt {
+public class BoardReceipt extends AbstractAuditableEntity<Long> {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -147,5 +155,37 @@ public class BoardReceipt {
 
     public void setDate(LocalDate date) {
         this.date = date;
+    }
+
+    @Override
+    public String entityType() {
+        return "BOARD_RECEIPT";
+    }
+
+    @Override
+    public Map<String, Object> auditState() {
+        return auditStateOf(
+                "boardId", boardId,
+                "boardRef", boardRef,
+                "employerRef", employerRef,
+                "employerId", employerId,
+                "toliId", toliId,
+                "amount", amount != null ? amount.toPlainString() : null,
+                "utrNumber", utrNumber,
+                "status", status,
+                "maker", maker,
+                "checker", checker,
+                "date", date != null ? date.toString() : null
+        );
+    }
+
+    @Override
+    public String changeSummary(EntityAuditAction action,
+                                Map<String, Object> oldState,
+                                Map<String, Object> newState) {
+        if (action == EntityAuditAction.UPDATE) {
+            return "Board receipt totals adjusted";
+        }
+        return null;
     }
 }

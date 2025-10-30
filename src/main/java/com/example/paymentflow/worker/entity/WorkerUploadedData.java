@@ -288,4 +288,5 @@ public class WorkerUploadedData {
     public void setReceiptNumber(String receiptNumber) {
         this.receiptNumber = receiptNumber;
     }
+
 }

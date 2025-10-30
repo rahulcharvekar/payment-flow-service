@@ -1,14 +1,20 @@
 package com.example.paymentflow.master.entity;
 
+import com.shared.entityaudit.annotation.EntityAuditEnabled;
+import com.shared.entityaudit.descriptor.AbstractAuditableEntity;
+import com.shared.entityaudit.listener.SharedEntityAuditListener;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
+@EntityAuditEnabled
+@EntityListeners(SharedEntityAuditListener.class)
 @Table(name = "employer_master")
-public class EmployerMaster {
+public class EmployerMaster extends AbstractAuditableEntity<Long> {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -204,5 +210,30 @@ public class EmployerMaster {
     @Deprecated(forRemoval = false)
     public void setEmployerName(String employerName) {
         this.establishmentName = employerName;
+    }
+
+    @Override
+    public String entityType() {
+        return "EMPLOYER_MASTER";
+    }
+
+    @Override
+    public Map<String, Object> auditState() {
+        return auditStateOf(
+                "id", id,
+                "employerId", employerId,
+                "serialNo", serialNo,
+                "registrationNo", registrationNo,
+                "establishmentName", establishmentName,
+                "address", address,
+                "ownerName", ownerName,
+                "mobileNumber", mobileNumber,
+                "aadhaarNumber", aadhaarNumber,
+                "panNumber", panNumber,
+                "tanNumber", tanNumber,
+                "status", status,
+                "createdAt", createdAt != null ? createdAt.toString() : null,
+                "updatedAt", updatedAt != null ? updatedAt.toString() : null
+        );
     }
 }

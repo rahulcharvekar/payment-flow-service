@@ -1,7 +1,11 @@
 package com.example.paymentflow.worker.entity;
 
+import com.shared.entityaudit.annotation.EntityAuditEnabled;
+import com.shared.entityaudit.descriptor.AbstractAuditableEntity;
+import com.shared.entityaudit.listener.SharedEntityAuditListener;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -10,12 +14,15 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
 @Entity
+@EntityAuditEnabled
+@EntityListeners(SharedEntityAuditListener.class)
 @Table(name = "worker_payments")
-public class WorkerPayment {
+public class WorkerPayment extends AbstractAuditableEntity<Long> {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -222,5 +229,33 @@ public class WorkerPayment {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    @Override
+    public String entityType() {
+        return "WORKER_PAYMENT";
+    }
+
+    @Override
+    public Map<String, Object> auditState() {
+        return auditStateOf(
+                "id", id,
+                "workerRef", workerRef,
+                "regId", regId,
+                "name", name,
+                "employerId", employerId,
+                "toliId", toliId,
+                "toli", toli,
+                "aadhar", aadhar,
+                "pan", pan,
+                "bankAccount", bankAccount,
+                "paymentAmount", paymentAmount != null ? paymentAmount.toPlainString() : null,
+                "fileId", fileId,
+                "uploadedFileRef", uploadedFileRef,
+                "requestReferenceNumber", requestReferenceNumber,
+                "status", status,
+                "receiptNumber", receiptNumber,
+                "createdAt", createdAt != null ? createdAt.toString() : null
+        );
     }
 }
