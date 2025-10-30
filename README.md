@@ -113,7 +113,7 @@ Mermaid flow:
 ```mermaid
 flowchart LR
   P[WorkerPayments pool] -->|service| RC[Create WorkerPaymentReceipt]
-  RC -->|POST /api/worker/receipts/{receiptNumber}/send-to-employer| E[Set status PAYMENT_INITIATED]
+  RC -->|POST /api/worker/receipts/(receiptNumber)/send-to-employer| E[Set status PAYMENT_INITIATED]
   E --> EP[Create EmployerPaymentReceipt (PENDING)]
   EP -->|notify employer| EM[Employer system reviews]
 ```
