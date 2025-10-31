@@ -72,10 +72,18 @@ shared-lib:
       url: http://localhost:8080/internal/auth/introspect
       api-key: ${INTERNAL_API_KEY:}
       api-key-header: X-Internal-Api-Key
+    dynamic-rbac:
+      enabled: true
+      base-url: ${AUTH_BASE_URL:http://localhost:8080}
+      authorization-matrix-path: /internal/authz/users/{userId}/matrix
+      endpoint-metadata-path: /internal/authz/endpoints/metadata
+      policy-evaluation-enabled: true
+      fail-open: false        # flip to true only if you want allow-on-error
   filters:
     enabled: true 
   file-upload:
     enabled: true
     base-dir: /Users/rahulcharvekar/Documents/Repos/LBE/PaymentReconciliation/payment-flow-service/uploads/dev/ 
+
 server:
   port: 8081
