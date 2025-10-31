@@ -2,32 +2,31 @@ package com.example.paymentflow.worker.controller;
 
 import com.example.paymentflow.worker.entity.WorkerPayment;
 import com.example.paymentflow.worker.service.WorkerPaymentService;
-import java.net.URI;
-import java.util.List;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpHeaders;
-import jakarta.servlet.http.HttpServletRequest;
+import com.shared.common.annotation.Auditable;
+import com.shared.common.annotation.SecurePagination;
+import com.shared.common.dto.SecurePaginationRequest;
+import com.shared.common.dto.SecurePaginationResponse;
 import com.shared.common.util.ETagUtil;
-import org.slf4j.Logger;
+import com.shared.common.util.SecurePaginationUtil;
 import com.shared.utilities.logger.LoggerFactoryProvider;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import com.shared.common.annotation.Auditable;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/worker-payments")
@@ -59,51 +58,57 @@ public class WorkerPaymentController {
     @PostMapping("/secure")
     @Operation(summary = "Get worker payments with secure pagination and filtering",
                description = "Returns paginated worker payments with optional status and receipt number filters, using secure pagination (mandatory date range, opaque tokens)")
-    @com.shared.common.annotation.SecurePagination
+    @SecurePagination
     public ResponseEntity<?> getPaymentsSecure(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Secure pagination request with mandatory date range",
                 required = true
             )
-            @jakarta.validation.Valid @RequestBody
-            com.shared.common.dto.SecurePaginationRequest request,
+            @Valid @RequestBody
+            SecurePaginationRequest request,
             @Parameter(description = "Receipt number filter") @RequestParam(required = false) String receiptNumber,
-            jakarta.servlet.http.HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest) {
         log.info("Fetching worker payments with secure pagination, status: {}, receiptNumber: {}, request: {}", 
                 request.getStatus(), receiptNumber, request);
         try {
-            // Apply pageToken if present
-            com.shared.common.util.SecurePaginationUtil.applyPageToken(request);
-            com.shared.common.util.SecurePaginationUtil.ValidationResult validation =
-                com.shared.common.util.SecurePaginationUtil.validatePaginationRequest(request);
+            // Apply pageToken if present (decodes token and sets page/size/sort)
+            SecurePaginationUtil.applyPageToken(request);
+            SecurePaginationUtil.ValidationResult validation =
+                SecurePaginationUtil.validatePaginationRequest(request);
             if (!validation.isValid()) {
                 return ResponseEntity.badRequest().body(
-                    com.shared.common.util.SecurePaginationUtil.createErrorResponse(validation));
+                    SecurePaginationUtil.createErrorResponse(validation));
             }
-            // Use only pageToken and filters for cursor-based pagination
-            String nextPageToken = request.getPageToken();
+            
             // Create sort object with secure field validation
             List<String> allowedSortFields = List.of("id", "name", "workerRef", "employerId", "paymentAmount", "status", "createdAt", "receiptNumber");
-            org.springframework.data.domain.Sort sort = com.shared.common.util.SecurePaginationUtil.createSecureSort(request, allowedSortFields);
+            Sort sort = SecurePaginationUtil.createSecureSort(request, allowedSortFields);
             
-            org.springframework.data.domain.Page<WorkerPayment> paymentsPage =
-                service.findByStatusAndReceiptNumberAndDateRangeWithToken(
+            // Create Pageable from request (either from decoded token or direct parameters)
+            Pageable pageable = PageRequest.of(
+                request.getPage(),
+                request.getSize(),
+                sort
+            );
+            
+            // Fetch data using standard pagination
+            Page<WorkerPayment> paymentsPage =
+                service.findByStatusAndReceiptNumberAndDateRange(
                     request.getStatus(), receiptNumber, 
                     validation.getStartDateTime(), validation.getEndDateTime(), 
-                    sort, 
-                    nextPageToken);
-            com.shared.common.dto.SecurePaginationResponse<WorkerPayment> response =
-                com.shared.common.util.SecurePaginationUtil.createSecureResponse(paymentsPage, request);
+                    pageable);
+            SecurePaginationResponse<WorkerPayment> response =
+                SecurePaginationUtil.createSecureResponse(paymentsPage, request);
             String responseJson = objectMapper.writeValueAsString(response);
-            String eTag = com.shared.common.util.ETagUtil.generateETag(responseJson);
-            String ifNoneMatch = httpRequest.getHeader(org.springframework.http.HttpHeaders.IF_NONE_MATCH);
+            String eTag = ETagUtil.generateETag(responseJson);
+            String ifNoneMatch = httpRequest.getHeader(HttpHeaders.IF_NONE_MATCH);
             if (eTag.equals(ifNoneMatch)) {
                 return ResponseEntity.status(304).eTag(eTag).build();
             }
             return ResponseEntity.ok().eTag(eTag).body(response);
         } catch (Exception e) {
             log.error("Error fetching worker payments (secure)", e);
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -157,10 +162,10 @@ public class WorkerPaymentController {
         try {
             // Validate sortBy against allowed fields for security
             List<String> allowedSortFields = List.of("id", "name", "workerRef", "employerId", "paymentAmount", "status", "createdAt", "receiptNumber");
-            Sort sort = com.shared.common.util.SecurePaginationUtil.createSort(sortBy, sortDir, allowedSortFields);
+            Sort sort = SecurePaginationUtil.createSort(sortBy, sortDir, allowedSortFields);
             Pageable pageable = PageRequest.of(page, size, sort);
             Page<WorkerPayment> paymentsPage = service.findByUploadedFileRefPaginated(uploadedFileRef, pageable);
-            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            Map<String, Object> response = new java.util.HashMap<>();
             response.put("payments", paymentsPage.getContent());
             response.put("totalElements", paymentsPage.getTotalElements());
             response.put("totalPages", paymentsPage.getTotalPages());
@@ -180,7 +185,7 @@ public class WorkerPaymentController {
             return ResponseEntity.ok().eTag(eTag).body(response);
         } catch (Exception e) {
             log.error("Error fetching payments by uploadedFileRef: {}", uploadedFileRef, e);
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 }

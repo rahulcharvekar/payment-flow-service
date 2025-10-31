@@ -1,23 +1,31 @@
 package com.example.paymentflow.board.controller;
 
-import com.example.paymentflow.board.entity.BoardReceiptProcessRequest;
-
 import com.example.paymentflow.board.entity.BoardReceipt;
+import com.example.paymentflow.board.entity.BoardReceiptProcessRequest;
 import com.example.paymentflow.board.service.BoardReceiptService;
+import com.shared.common.annotation.Auditable;
+import com.shared.common.annotation.SecurePagination;
+import com.shared.common.dto.SecurePaginationRequest;
+import com.shared.common.dto.SecurePaginationResponse;
+import com.shared.common.util.ETagUtil;
+import com.shared.common.util.SecurePaginationUtil;
+import com.shared.utilities.logger.LoggerFactoryProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.slf4j.Logger;
-import com.shared.utilities.logger.LoggerFactoryProvider;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpHeaders;
 import jakarta.servlet.http.HttpServletRequest;
-import com.shared.common.util.ETagUtil;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.Map;
-import com.shared.common.annotation.Auditable;
 
 @RestController
 @RequestMapping("/api/v1/board-receipts")
@@ -45,43 +53,57 @@ public class BoardReceiptController {
     @PostMapping("/secure")
     @Operation(summary = "Get all board receipts with secure pagination and filtering",
                description = "Returns paginated board receipts with optional status and date range filters, using secure pagination (mandatory date range, opaque tokens)")
-    @com.shared.common.annotation.SecurePagination
+    @SecurePagination
     public ResponseEntity<?> getAllBoardReceiptsSecure(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Secure pagination request with mandatory date range",
                 required = true
             )
-            @jakarta.validation.Valid @RequestBody
-            com.shared.common.dto.SecurePaginationRequest request,
-            jakarta.servlet.http.HttpServletRequest httpRequest) {
+            @Valid @RequestBody
+            SecurePaginationRequest request,
+            HttpServletRequest httpRequest) {
         log.info("Fetching board receipts with secure pagination, status: {}, request: {}", request.getStatus(), request);
         try {
-            // Apply pageToken if present
-            com.shared.common.util.SecurePaginationUtil.applyPageToken(request);
-            com.shared.common.util.SecurePaginationUtil.ValidationResult validation =
-                com.shared.common.util.SecurePaginationUtil.validatePaginationRequest(request);
+            // Apply pageToken if present (decodes token and sets page/size/sort)
+            SecurePaginationUtil.applyPageToken(request);
+            SecurePaginationUtil.ValidationResult validation =
+                SecurePaginationUtil.validatePaginationRequest(request);
             if (!validation.isValid()) {
                 return ResponseEntity.badRequest().body(
-                    com.shared.common.util.SecurePaginationUtil.createErrorResponse(validation));
+                    SecurePaginationUtil.createErrorResponse(validation));
             }
-            // Use only nextPageToken and filters for cursor-based pagination
-            String nextPageToken = request.getPageToken();
-            org.springframework.data.domain.Page<BoardReceipt> receiptsPage =
-                service.findByStatusAndDateRangeWithToken(request.getStatus(), validation.getStartDateTime(), validation.getEndDateTime(), nextPageToken, request.getSortBy(), request.getSortDir());
-            com.shared.common.dto.SecurePaginationResponse<BoardReceipt> response =
-                com.shared.common.util.SecurePaginationUtil.createSecureResponse(receiptsPage, request);
+            
+            // Create Pageable from request (either from decoded token or direct parameters)
+            Pageable pageable = PageRequest.of(
+                request.getPage(),
+                request.getSize(),
+                Sort.by(
+                    Sort.Direction.fromString(request.getSortDir()),
+                    request.getSortBy()
+                )
+            );
+            
+            // Fetch data using standard pagination
+            Page<BoardReceipt> receiptsPage =
+                service.findByStatusAndDateRange(
+                    request.getStatus(), 
+                    validation.getStartDateTime(), 
+                    validation.getEndDateTime(), 
+                    pageable);
+            SecurePaginationResponse<BoardReceipt> response =
+                SecurePaginationUtil.createSecureResponse(receiptsPage, request);
             com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
             objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
             String responseJson = objectMapper.writeValueAsString(response);
-            String eTag = com.shared.common.util.ETagUtil.generateETag(responseJson);
-            String ifNoneMatch = httpRequest.getHeader(org.springframework.http.HttpHeaders.IF_NONE_MATCH);
+            String eTag = ETagUtil.generateETag(responseJson);
+            String ifNoneMatch = httpRequest.getHeader(HttpHeaders.IF_NONE_MATCH);
             if (eTag.equals(ifNoneMatch)) {
                 return ResponseEntity.status(304).eTag(eTag).build();
             }
             return ResponseEntity.ok().eTag(eTag).body(response);
         } catch (Exception e) {
             log.error("Error fetching board receipts (secure)", e);
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 

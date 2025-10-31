@@ -27,17 +27,29 @@ public class FileValidationService {
     }
 
     private Map<String, Object> validateWorkerFile(File file) {
-        // TODO: Implement worker file validation logic
-        return Map.of("message", "Worker file validation not implemented.");
+        // File validation not yet implemented - fail fast to prevent invalid data
+        throw new UnsupportedOperationException(
+            "Worker file validation is not yet implemented. " +
+            "Manual review and validation required before processing. " +
+            "Contact system administrator to enable validation."
+        );
     }
 
     private Map<String, Object> validateEmployerFile(File file) {
-        // TODO: Implement employer file validation logic
-        return Map.of("message", "Employer file validation not implemented.");
+        // File validation not yet implemented - fail fast to prevent invalid data
+        throw new UnsupportedOperationException(
+            "Employer file validation is not yet implemented. " +
+            "Manual review and validation required before processing. " +
+            "Contact system administrator to enable validation."
+        );
     }
 
     private Map<String, Object> validateMasterDataFile(File file) {
-        // TODO: Implement master data file validation logic
-        return Map.of("message", "Master data file validation not implemented.");
+        // File validation not yet implemented - fail fast to prevent invalid data
+        throw new UnsupportedOperationException(
+            "Master data file validation is not yet implemented. " +
+            "Manual review and validation required before processing. " +
+            "Contact system administrator to enable validation."
+        );
     }
 }

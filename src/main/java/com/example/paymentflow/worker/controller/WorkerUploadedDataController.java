@@ -1,32 +1,37 @@
 package com.example.paymentflow.worker.controller;
 
 import com.example.paymentflow.worker.entity.WorkerUploadedData;
-import com.example.paymentflow.worker.service.WorkerUploadedDataService;
 import com.example.paymentflow.worker.service.WorkerPaymentFileService;
-import java.util.List;
+import com.example.paymentflow.worker.service.WorkerUploadedDataService;
+import com.shared.common.annotation.SecurePagination;
+import com.shared.common.annotation.UiType;
+import com.shared.common.dto.SecurePaginationRequest;
+import com.shared.common.dto.SecurePaginationResponse;
+import com.shared.common.util.ETagUtil;
+import com.shared.common.util.SecurePaginationUtil;
+import com.shared.common.util.UiTypes;
+import com.shared.utilities.logger.LoggerFactoryProvider;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
-import jakarta.servlet.http.HttpServletRequest;
-import com.shared.common.util.ETagUtil;
-import com.shared.utilities.logger.LoggerFactoryProvider;
-
-import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import org.slf4j.Logger;
-
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -51,44 +56,44 @@ public class WorkerUploadedDataController {
     @Operation(summary = "Get secure paginated uploaded data", 
                description = "Retrieve paginated uploaded data with MANDATORY date range filtering for security. " +
                            "Prevents unrestricted data access and implements tamper-proof pagination tokens.")
-    @com.shared.common.annotation.SecurePagination
-    @com.shared.common.annotation.UiType(value = com.shared.common.util.UiTypes.LIST, usage = "Display paginated list of uploaded data with sorting and filtering")
+    @SecurePagination
+    @UiType(value = UiTypes.LIST, usage = "Display paginated list of uploaded data with sorting and filtering")
     public ResponseEntity<?> getSecurePaginatedUploadedData(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Secure pagination request with mandatory date range",
                 required = true
             )
-            @jakarta.validation.Valid @RequestBody 
-            com.shared.common.dto.SecurePaginationRequest request,
-            jakarta.servlet.http.HttpServletRequest httpRequest) {
+            @Valid @RequestBody 
+            SecurePaginationRequest request,
+            HttpServletRequest httpRequest) {
         
         log.info("Secure paginated request for uploaded data: {}", request);
         try {
             // Apply pageToken if present
-            com.shared.common.util.SecurePaginationUtil.applyPageToken(request);
+            SecurePaginationUtil.applyPageToken(request);
             // Validate request using utility
-            com.shared.common.util.SecurePaginationUtil.ValidationResult validation = 
-                com.shared.common.util.SecurePaginationUtil.validatePaginationRequest(request);
+            SecurePaginationUtil.ValidationResult validation = 
+                SecurePaginationUtil.validatePaginationRequest(request);
             if (!validation.isValid()) {
                 return ResponseEntity.badRequest().body(
-                    com.shared.common.util.SecurePaginationUtil.createErrorResponse(validation));
+                    SecurePaginationUtil.createErrorResponse(validation));
             }
             // Create pageable with secure field validation
             List<String> allowedSortFields = List.of("id", "workerName", "employerId", "paymentAmount", "status", "createdAt", "workDate", "receiptNumber");
-            org.springframework.data.domain.Sort sort = com.shared.common.util.SecurePaginationUtil.createSecureSort(request, allowedSortFields);
-            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+            Sort sort = SecurePaginationUtil.createSecureSort(request, allowedSortFields);
+            Pageable pageable = PageRequest.of(
                 request.getPage(), Math.min(request.getSize(), 100), sort);
             // Get paginated data with date filtering
-            org.springframework.data.domain.Page<WorkerUploadedData> dataPage = 
+            Page<WorkerUploadedData> dataPage = 
                 service.findByDateRangePaginated(validation.getStartDateTime(), validation.getEndDateTime(), pageable);
             // Create secure response with opaque tokens
-            com.shared.common.dto.SecurePaginationResponse<WorkerUploadedData> response = 
-                com.shared.common.util.SecurePaginationUtil.createSecureResponse(dataPage, request);
+            SecurePaginationResponse<WorkerUploadedData> response = 
+                SecurePaginationUtil.createSecureResponse(dataPage, request);
             com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
             objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
             String responseJson = objectMapper.writeValueAsString(response);
-            String eTag = com.shared.common.util.ETagUtil.generateETag(responseJson);
-            String ifNoneMatch = httpRequest.getHeader(org.springframework.http.HttpHeaders.IF_NONE_MATCH);
+            String eTag = ETagUtil.generateETag(responseJson);
+            String ifNoneMatch = httpRequest.getHeader(HttpHeaders.IF_NONE_MATCH);
             if (eTag.equals(ifNoneMatch)) {
                 return ResponseEntity.status(304).eTag(eTag).build();
             }
@@ -105,7 +110,7 @@ public class WorkerUploadedDataController {
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload worker payment file", 
                description = "Upload CSV, XLS, or XLSX file containing worker payment data. Returns fileId for subsequent operations.")
-    @com.shared.common.annotation.UiType(value = com.shared.common.util.UiTypes.UPLOAD, usage = "File upload button for worker payment data")
+    @UiType(value = UiTypes.UPLOAD, usage = "File upload button for worker payment data")
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
             // File type check
@@ -161,33 +166,38 @@ public class WorkerUploadedDataController {
     @PostMapping("/files/secure-summaries")
     @Operation(summary = "Get secure paginated file summaries", 
                description = "Returns paginated list of all uploaded files with comprehensive summaries, validation counts, and total amounts. Uses secure pagination with mandatory date range and opaque tokens.")
-    @com.shared.common.annotation.SecurePagination
+    @SecurePagination
     public ResponseEntity<?> getSecurePaginatedFileSummaries(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "Secure pagination request with mandatory date range",
                 required = true
             )
-            @jakarta.validation.Valid @RequestBody 
-            com.shared.common.dto.SecurePaginationRequest request) {
+            @Valid @RequestBody 
+            SecurePaginationRequest request) {
         log.info("Secure paginated file summaries request: {}", request);
-        com.shared.common.util.SecurePaginationUtil.ValidationResult validation = 
-            com.shared.common.util.SecurePaginationUtil.validatePaginationRequest(request);
+        
+        // Apply pageToken if present (decodes token and sets page/size/sort)
+        SecurePaginationUtil.applyPageToken(request);
+        
+        SecurePaginationUtil.ValidationResult validation = 
+            SecurePaginationUtil.validatePaginationRequest(request);
         if (!validation.isValid()) {
             return ResponseEntity.badRequest().body(
-                com.shared.common.util.SecurePaginationUtil.createErrorResponse(validation));
+                SecurePaginationUtil.createErrorResponse(validation));
         }
         try {
-            // Only use nextPageToken and filters for cursor-based pagination
+            // Extract parameters from request (either from decoded token or direct)
             String status = request.getStatus();
             String startDate = validation.getStartDateTime().toLocalDate().toString();
             String endDate = validation.getEndDateTime().toLocalDate().toString();
             String sortBy = request.getSortBy() != null ? request.getSortBy() : "uploadDate";
             String sortDir = request.getSortDir() != null ? request.getSortDir() : "desc";
-            String nextPageToken = request.getPageToken();
+            int page = request.getPage();
+            int size = request.getSize();
 
-            // Use service to get paginated file summaries (one per file) using cursor
-            Map<String, Object> paginatedSummaries = service.getPaginatedFileSummariesWithToken(
-                nextPageToken, null, status, startDate, endDate, sortBy, sortDir);
+            // Use service to get paginated file summaries using standard pagination
+            Map<String, Object> paginatedSummaries = service.getPaginatedFileSummaries(
+                page, size, null, status, startDate, endDate, sortBy, sortDir);
             return ResponseEntity.ok(paginatedSummaries);
         } catch (Exception e) {
             log.error("Error in secure paginated file summaries retrieval", e);

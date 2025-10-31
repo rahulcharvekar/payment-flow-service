@@ -11,13 +11,29 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public class BoardReceiptQueryDao {
     
     @Autowired
     private JdbcTemplate jdbcTemplate;
-    
+
+    private static final Set<String> ALLOWED_SORT_COLUMNS = Set.of(
+            "id",
+            "board_id",
+            "board_reference",
+            "employer_reference",
+            "employer_id",
+            "toli_id",
+            "amount",
+            "utr_number",
+            "status",
+            "maker",
+            "checker",
+            "receipt_date"
+    );
+
     private static final String BASE_SELECT = """
         SELECT br.id, br.board_id, br.board_reference, br.employer_reference, 
                br.employer_id, br.toli_id, br.amount, br.utr_number, br.status, 
@@ -55,19 +71,81 @@ public class BoardReceiptQueryDao {
     public List<BoardReceipt> findByStatusAndDateRange(String status, LocalDateTime startDate, LocalDateTime endDate) {
         return findByStatusAndDateRange(status, startDate, endDate, "receipt_date", "desc");
     }
-    
+
     public List<BoardReceipt> findByStatusAndDateRange(String status, LocalDateTime startDate, LocalDateTime endDate, String sortBy, String sortDir) {
-        String sql;
-        Object[] params;
-        String orderBy = " ORDER BY " + sortBy + " " + sortDir.toUpperCase();
-        if (status != null && !status.isEmpty()) {
-            sql = BASE_SELECT + " WHERE br.status = ? AND br.receipt_date BETWEEN ? AND ?" + orderBy;
-            params = new Object[]{status, startDate.toLocalDate(), endDate.toLocalDate()};
+        OrderClause orderClause = sanitizeOrder(sortBy, sortDir);
+        QuerySpec querySpec = buildRangeQuery(status, startDate, endDate, orderClause, null, null);
+        return jdbcTemplate.query(querySpec.sql(), new BoardReceiptRowMapper(), querySpec.params());
+    }
+
+    public PageResult findByStatusAndDateRange(String status,
+                                               LocalDateTime startDate,
+                                               LocalDateTime endDate,
+                                               int page,
+                                               int size,
+                                               String sortBy,
+                                               String sortDir) {
+        OrderClause orderClause = sanitizeOrder(sortBy, sortDir);
+        int pageSafe = Math.max(page, 0);
+        int sizeSafe = Math.max(size, 1);
+        QuerySpec querySpec = buildRangeQuery(status, startDate, endDate, orderClause, sizeSafe, pageSafe * sizeSafe);
+        List<BoardReceipt> content = jdbcTemplate.query(querySpec.sql(), new BoardReceiptRowMapper(), querySpec.params());
+        Long total = countRange(status, startDate, endDate);
+        return new PageResult(content, total != null ? total : 0L);
+    }
+
+    private QuerySpec buildRangeQuery(String status,
+                                      LocalDateTime startDate,
+                                      LocalDateTime endDate,
+                                      OrderClause orderClause,
+                                      Integer limit,
+                                      Integer offset) {
+        boolean hasStatus = status != null && !status.isEmpty();
+        StringBuilder sql = new StringBuilder(BASE_SELECT);
+        if (hasStatus) {
+            sql.append(" WHERE br.status = ? AND br.receipt_date BETWEEN ? AND ?");
         } else {
-            sql = BASE_SELECT + " WHERE br.receipt_date BETWEEN ? AND ?" + orderBy;
-            params = new Object[]{startDate.toLocalDate(), endDate.toLocalDate()};
+            sql.append(" WHERE br.receipt_date BETWEEN ? AND ?");
         }
-        return jdbcTemplate.query(sql, new BoardReceiptRowMapper(), params);
+        sql.append(orderClause.sql());
+        List<Object> params = new java.util.ArrayList<>();
+        if (hasStatus) {
+            params.add(status);
+        }
+        params.add(startDate.toLocalDate());
+        params.add(endDate.toLocalDate());
+        if (limit != null && offset != null) {
+            sql.append(" LIMIT ? OFFSET ?");
+            params.add(limit);
+            params.add(offset);
+        }
+        return new QuerySpec(sql.toString(), params.toArray());
+    }
+
+    private Long countRange(String status, LocalDateTime startDate, LocalDateTime endDate) {
+        boolean hasStatus = status != null && !status.isEmpty();
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM board_receipts br WHERE ");
+        if (hasStatus) {
+            sql.append("br.status = ? AND br.receipt_date BETWEEN ? AND ?");
+        } else {
+            sql.append("br.receipt_date BETWEEN ? AND ?");
+        }
+        List<Object> params = new java.util.ArrayList<>();
+        if (hasStatus) {
+            params.add(status);
+        }
+        params.add(startDate.toLocalDate());
+        params.add(endDate.toLocalDate());
+        return jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
+    }
+
+    private OrderClause sanitizeOrder(String sortBy, String sortDir) {
+        String sanitizedColumn = ALLOWED_SORT_COLUMNS.contains(sortBy) ? sortBy : "receipt_date";
+        String sanitizedDirection = "DESC";
+        if ("ASC".equalsIgnoreCase(sortDir)) {
+            sanitizedDirection = "ASC";
+        }
+        return new OrderClause(" ORDER BY br." + sanitizedColumn + " " + sanitizedDirection);
     }
     
     public List<BoardReceipt> findByMaker(String maker) {
@@ -132,7 +210,7 @@ public class BoardReceiptQueryDao {
         String pattern = "%" + searchTerm + "%";
         return jdbcTemplate.query(sql, new BoardReceiptRowMapper(), pattern, pattern);
     }
-    
+
     private static class BoardReceiptRowMapper implements RowMapper<BoardReceipt> {
         @Override
         public BoardReceipt mapRow(ResultSet rs, int rowNum) throws SQLException {
@@ -159,5 +237,14 @@ public class BoardReceiptQueryDao {
             
             return receipt;
         }
+    }
+
+    public record PageResult(List<BoardReceipt> content, long totalElements) {
+    }
+
+    private record OrderClause(String sql) {
+    }
+
+    private record QuerySpec(String sql, Object[] params) {
     }
 }

@@ -39,9 +39,9 @@ management:
 app:
   jwt:
     secret: ${APP_JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-    issuer: user-auth-service
-    audience: payment-services
-    expiration: 86400
+    issuer: ${APP_JWT_ISSUER:user-auth-service}
+    audience: ${APP_JWT_AUDIENCE:payment-services}
+    expiration: ${APP_JWT_EXPIRATION:86400}
 
 shared-lib:
   security:

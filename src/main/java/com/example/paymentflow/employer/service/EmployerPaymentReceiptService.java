@@ -15,7 +15,6 @@ import com.shared.utilities.logger.LoggerFactoryProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -31,24 +30,9 @@ import java.util.Optional;
 @Service
 @Transactional
 public class EmployerPaymentReceiptService {
-    /**
-     * Cursor-based pagination for employer payment receipts (stub implementation).
-     * @param status Payment status filter
-     * @param start Start date
-     * @param end End date
-     * @param nextPageToken Opaque cursor for next page
-     * @return Page of EmployerPaymentReceipt
-     */
-    @Transactional(readOnly = true)
-    public Page<EmployerPaymentReceipt> findAvailableByStatusAndDateRangeWithToken(String status, java.time.LocalDateTime start, java.time.LocalDateTime end, String nextPageToken) {
-        // TODO: Implement real cursor-based pagination logic
-        // For now, fallback to first page of classic pagination
-        Pageable pageable = PageRequest.of(0, 20, Sort.by("validatedAt").descending());
-        return findAvailableByStatusAndDateRange(status, start, end, pageable);
-    }
 
     @Transactional(readOnly = true)
-    public Page<EmployerPaymentReceipt> findAvailableByStatusAndDateRange(String status, java.time.LocalDateTime start, java.time.LocalDateTime end, Pageable pageable) {
+    public Page<EmployerPaymentReceipt> findAvailableByStatusAndDateRangePaginated(String status, java.time.LocalDateTime start, java.time.LocalDateTime end, Pageable pageable) {
         log.info("Finding available employer receipts with status: {} and date range: {} to {} (paginated)", status, start, end);
         String filterStatus = (status != null && !status.trim().isEmpty()) ? status : "PAYMENT_INITIATED";
         if (start != null && end != null && status != null && !status.trim().isEmpty()) {
@@ -84,8 +68,8 @@ public class EmployerPaymentReceiptService {
 
         @Transactional(readOnly = true)
     public List<WorkerPaymentReceipt> getAvailableReceipts() {
-        log.info("Retrieving worker receipts available for employer validation using query DAO");
-        return workerReceiptQueryDao.findByStatus("PROCESSED");
+        log.info("Retrieving worker receipts available for employer validation");
+        return workerReceiptService.findByStatus("PROCESSED");
     }
 
     @Transactional(readOnly = true)
@@ -101,15 +85,13 @@ public class EmployerPaymentReceiptService {
         String filterStatus = (status != null && !status.trim().isEmpty()) ? status : "PAYMENT_INITIATED";
         
         Page<WorkerPaymentReceipt> receiptsPage;
-        
-        // Handle date filtering using query DAO (converting to simple lists for now)
-        List<WorkerPaymentReceipt> allReceipts;
         if (singleDate != null && !singleDate.trim().isEmpty()) {
             // Single date filter
             LocalDate date = LocalDate.parse(singleDate);
             LocalDateTime startOfDay = date.atStartOfDay();
             LocalDateTime endOfDay = date.atTime(23, 59, 59);
-            allReceipts = workerReceiptQueryDao.findByStatusAndDateRange(filterStatus, startOfDay, endOfDay);
+            receiptsPage = workerReceiptService.findByStatusAndDateRangePaginated(
+                filterStatus, startOfDay, endOfDay, pageable);
             
         } else if (startDate != null && !startDate.trim().isEmpty() && endDate != null && !endDate.trim().isEmpty()) {
             // Date range filter
@@ -117,18 +99,13 @@ public class EmployerPaymentReceiptService {
             LocalDate end = LocalDate.parse(endDate);
             LocalDateTime startDateTime = start.atStartOfDay();
             LocalDateTime endDateTime = end.atTime(23, 59, 59);
-            allReceipts = workerReceiptQueryDao.findByStatusAndDateRange(filterStatus, startDateTime, endDateTime);
+            receiptsPage = workerReceiptService.findByStatusAndDateRangePaginated(
+                filterStatus, startDateTime, endDateTime, pageable);
             
         } else {
             // No date filter, just status
-            allReceipts = workerReceiptQueryDao.findByStatus(filterStatus);
+            receiptsPage = workerReceiptService.findByStatusPaginated(filterStatus, pageable);
         }
-        
-        // Manual pagination since our DAO doesn't support it yet
-        int start = Math.min(page * size, allReceipts.size());
-        int end = Math.min(start + size, allReceipts.size());
-        List<WorkerPaymentReceipt> pageContent = allReceipts.subList(start, end);
-        receiptsPage = new PageImpl<>(pageContent, pageable, allReceipts.size());
         
         // Create response
         Map<String, Object> response = new HashMap<>();

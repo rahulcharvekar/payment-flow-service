@@ -4,6 +4,7 @@ import com.example.paymentflow.worker.entity.WorkerPayment;
 import com.example.paymentflow.worker.entity.WorkerPaymentReceipt;
 import com.example.paymentflow.worker.repository.WorkerPaymentReceiptRepository;
 import com.example.paymentflow.worker.dao.WorkerPaymentReceiptQueryDao;
+import com.shared.common.dao.BaseQueryDao.PageResult;
 import org.slf4j.Logger;
 import com.shared.utilities.logger.LoggerFactoryProvider;
 import org.springframework.stereotype.Service;
@@ -12,39 +13,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 @Service
 @Transactional
 public class WorkerPaymentReceiptService {
-    /**
-     * Cursor-based pagination for worker payment receipts (stub implementation).
-     * @param status Receipt status filter
-     * @param startDate Start date
-     * @param endDate End date
-     * @param nextPageToken Opaque cursor for next page
-     * @return Page of WorkerPaymentReceipt
-     */
-    public org.springframework.data.domain.Page<WorkerPaymentReceipt> findByStatusAndDateRangeWithToken(
-            String status, java.time.LocalDateTime startDate, java.time.LocalDateTime endDate, String nextPageToken) {
-        // TODO: Implement real cursor-based pagination logic
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("validatedAt").descending());
-        return findByStatusAndDateRangePaginated(status, startDate, endDate, pageable);
-    }
-
-    /**
-     * Cursor-based pagination for worker payment receipts by date range (stub implementation).
-     * @param startDate Start date
-     * @param endDate End date
-     * @param nextPageToken Opaque cursor for next page
-     * @return Page of WorkerPaymentReceipt
-     */
-    public org.springframework.data.domain.Page<WorkerPaymentReceipt> findByDateRangeWithToken(
-            java.time.LocalDateTime startDate, java.time.LocalDateTime endDate, String nextPageToken) {
-        // TODO: Implement real cursor-based pagination logic
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("validatedAt").descending());
-        return findByDateRangePaginated(startDate, endDate, pageable);
-    }
     
     private static final Logger log = LoggerFactoryProvider.getLogger(WorkerPaymentReceiptService.class);
     
@@ -54,6 +31,31 @@ public class WorkerPaymentReceiptService {
     public WorkerPaymentReceiptService(WorkerPaymentReceiptRepository repository, WorkerPaymentReceiptQueryDao queryDao) {
         this.repository = repository;
         this.queryDao = queryDao;
+    }
+
+    private static final int FETCH_BATCH_SIZE = 500;
+
+    private <T> List<T> collectAll(BiFunction<Integer, Integer, PageResult<T>> pageSupplier) {
+        return collectAll(pageSupplier, null);
+    }
+
+    private <T> List<T> collectAll(BiFunction<Integer, Integer, PageResult<T>> pageSupplier,
+                                   Predicate<T> filter) {
+        List<T> results = new ArrayList<>();
+        int page = 0;
+        while (true) {
+            var pageResult = pageSupplier.apply(page, FETCH_BATCH_SIZE);
+            List<T> content = pageResult.getContent();
+            if (filter != null) {
+                content = content.stream().filter(filter).toList();
+            }
+            results.addAll(content);
+            if (!pageResult.hasNext()) {
+                break;
+            }
+            page++;
+        }
+        return results;
     }
 
     public WorkerPaymentReceipt createReceipt(List<WorkerPayment> processedPayments) {
@@ -121,13 +123,8 @@ public class WorkerPaymentReceiptService {
             
             log.warn("Receipt number {} already exists, retrying... (attempt {})", receiptNumber, attempt);
             
-            // Small delay to avoid immediate collision
-            try {
-                Thread.sleep(1);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("Interrupted while generating receipt number", e);
-            }
+            // No artificial delay needed - the next iteration will use a different nanoTime()
+            // and random component, ensuring uniqueness without blocking
             
         } while (attempt < maxAttempts);
         
@@ -136,44 +133,45 @@ public class WorkerPaymentReceiptService {
 
     public List<WorkerPaymentReceipt> findByStatus(String status) {
         log.info("Finding worker payment receipts with status: {}", status);
-        return queryDao.findByStatus(status);
+        return collectAll((page, size) -> queryDao.findByStatus(status, page, size));
     }
 
     public List<WorkerPaymentReceipt> findAll() {
         log.info("Finding all worker payment receipts");
-        return queryDao.findAll();
+        return collectAll(queryDao::findAll);
     }
 
-    public java.util.Optional<WorkerPaymentReceipt> findByReceiptNumber(String receiptNumber) {
+    public Optional<WorkerPaymentReceipt> findByReceiptNumber(String receiptNumber) {
         log.info("Finding worker payment receipt by receipt number: {}", receiptNumber);
         return queryDao.findByReceiptNumber(receiptNumber);
     }
 
     public org.springframework.data.domain.Page<WorkerPaymentReceipt> findByStatusPaginated(String status, org.springframework.data.domain.Pageable pageable) {
         log.info("Finding worker payment receipts with status: {} (paginated)", status);
-        // For now, return a simple implementation - can be enhanced later with proper pagination
-        List<WorkerPaymentReceipt> results = queryDao.findByStatus(status);
-        return new org.springframework.data.domain.PageImpl<>(results, pageable, results.size());
+        var pageResult = queryDao.findByStatus(status, pageable.getPageNumber(), pageable.getPageSize());
+        return new org.springframework.data.domain.PageImpl<>(pageResult.getContent(), pageable, pageResult.getTotalElements());
     }
 
     public org.springframework.data.domain.Page<WorkerPaymentReceipt> findAllPaginated(org.springframework.data.domain.Pageable pageable) {
         log.info("Finding all worker payment receipts (paginated)");
-        List<WorkerPaymentReceipt> results = queryDao.findAll();
-        return new org.springframework.data.domain.PageImpl<>(results, pageable, results.size());
+        var pageResult = queryDao.findAll(pageable.getPageNumber(), pageable.getPageSize());
+        return new org.springframework.data.domain.PageImpl<>(pageResult.getContent(), pageable, pageResult.getTotalElements());
     }
 
     public org.springframework.data.domain.Page<WorkerPaymentReceipt> findByStatusAndDateRangePaginated(
             String status, LocalDateTime startDate, LocalDateTime endDate, org.springframework.data.domain.Pageable pageable) {
         log.info("Finding worker payment receipts with status: {} between {} and {} (paginated)", status, startDate, endDate);
-        List<WorkerPaymentReceipt> results = queryDao.findByStatusAndDateRange(status, startDate, endDate);
-        return new org.springframework.data.domain.PageImpl<>(results, pageable, results.size());
+        var pageResult = queryDao.findByStatusAndDateRange(status, startDate, endDate,
+                pageable.getPageNumber(), pageable.getPageSize());
+        return new org.springframework.data.domain.PageImpl<>(pageResult.getContent(), pageable, pageResult.getTotalElements());
     }
 
     public org.springframework.data.domain.Page<WorkerPaymentReceipt> findByDateRangePaginated(
             LocalDateTime startDate, LocalDateTime endDate, org.springframework.data.domain.Pageable pageable) {
         log.info("Finding worker payment receipts between {} and {} (paginated)", startDate, endDate);
-        List<WorkerPaymentReceipt> results = queryDao.findByDateRange(startDate, endDate);
-        return new org.springframework.data.domain.PageImpl<>(results, pageable, results.size());
+        var pageResult = queryDao.findByDateRange(startDate, endDate,
+                pageable.getPageNumber(), pageable.getPageSize());
+        return new org.springframework.data.domain.PageImpl<>(pageResult.getContent(), pageable, pageResult.getTotalElements());
     }
 
     public WorkerPaymentReceipt updateStatus(String receiptNumber, String newStatus) {

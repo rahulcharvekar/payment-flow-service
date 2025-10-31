@@ -343,29 +343,6 @@ public class WorkerUploadedDataService {
         }
     }
 
-    /**
-     * Cursor-based pagination for file summaries (stub implementation).
-     * @param nextPageToken Opaque cursor for next page
-     * @param fileId Optional fileId filter
-     * @param status Status filter
-     * @param startDate Start date (YYYY-MM-DD)
-     * @param endDate End date (YYYY-MM-DD)
-     * @param sortBy Sort field
-     * @param sortDir Sort direction
-     * @return Map with paginated summaries and nextPageToken
-     */
-    public Map<String, Object> getPaginatedFileSummariesWithToken(
-            String nextPageToken, String fileId, String status, String startDate, String endDate, String sortBy, String sortDir) {
-        // TODO: Implement real cursor-based pagination logic
-        // For now, fallback to first page of classic pagination
-        int page = 0;
-        int size = 20;
-        Map<String, Object> result = getPaginatedFileSummaries(page, size, fileId, status, startDate, endDate, sortBy, sortDir);
-        // Add a dummy nextPageToken for demonstration
-        result.put("nextPageToken", null); // Or generate a real token if needed
-        return result;
-    }
-
     @Transactional
     public void validateUploadedData(String fileId) {
         log.info("Starting validation for fileId: {}", fileId);

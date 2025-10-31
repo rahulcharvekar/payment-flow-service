@@ -5,8 +5,11 @@ import com.shared.exception.ResourceNotFoundException;
 import com.example.paymentflow.worker.repository.WorkerPaymentRepository;
 import com.example.paymentflow.worker.dao.WorkerPaymentQueryDao;
 import com.shared.common.dao.BaseQueryDao.PageResult; // Uncomment if exists
+import java.util.ArrayList;
 import java.util.List;
 import java.time.LocalDateTime;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 import org.slf4j.Logger;
 import com.shared.utilities.logger.LoggerFactoryProvider; // Uncomment if exists
 import org.springframework.stereotype.Service;
@@ -26,6 +29,8 @@ public class WorkerPaymentService {
     private final WorkerPaymentRepository repository;
     private final WorkerPaymentQueryDao workerPaymentQueryDao;
 
+    private static final int FETCH_BATCH_SIZE = 500;
+
     public WorkerPaymentService(WorkerPaymentRepository repository, WorkerPaymentQueryDao workerPaymentQueryDao) {
         this.repository = repository;
         this.workerPaymentQueryDao = workerPaymentQueryDao;
@@ -37,6 +42,29 @@ public class WorkerPaymentService {
         WorkerPayment saved = repository.save(workerPayment);
         log.info("Persisted worker payment id={}", saved.getId());
         return saved;
+    }
+
+    private <T> List<T> collectAll(BiFunction<Integer, Integer, PageResult<T>> pageSupplier) {
+        return collectAll(pageSupplier, null);
+    }
+
+    private <T> List<T> collectAll(BiFunction<Integer, Integer, PageResult<T>> pageSupplier,
+                                   Predicate<T> filter) {
+        List<T> results = new ArrayList<>();
+        int page = 0;
+        while (true) {
+            PageResult<T> pageResult = pageSupplier.apply(page, FETCH_BATCH_SIZE);
+            List<T> content = pageResult.getContent();
+            if (filter != null) {
+                content = content.stream().filter(filter).toList();
+            }
+            results.addAll(content);
+            if (!pageResult.hasNext()) {
+                break;
+            }
+            page++;
+        }
+        return results;
     }
 
     public List<WorkerPayment> createBulk(List<WorkerPayment> workerPayments) {
@@ -63,31 +91,30 @@ public class WorkerPaymentService {
     @Transactional(readOnly = true)
     public List<WorkerPayment> findByStatus(String status) {
         log.info("Finding worker payments with status: {} using query DAO", status);
-        // Using paginated method with large page size to get all results
-        return workerPaymentQueryDao.findByStatus(status, 0, 10000).getContent();
+        return collectAll((page, size) -> workerPaymentQueryDao.findByStatus(status, page, size));
     }
 
     @Transactional(readOnly = true)
     public List<WorkerPayment> findByReferencePrefixAndStatus(String prefix, String status) {
         log.info("Finding worker payments with reference prefix: {} and status: {} using query DAO", prefix, status);
-        // Use the filter method with null values for other filters
-        return workerPaymentQueryDao.findWithFilters(status, null, null, null, null, 0, 10000).getContent()
-                .stream()
-                .filter(wp -> wp.getRequestReferenceNumber().startsWith(prefix))
-                .toList();
+        if (prefix == null || prefix.isEmpty()) {
+            return collectAll((page, size) -> workerPaymentQueryDao.findWithFilters(status, null, null, null, null, page, size));
+        }
+        Predicate<WorkerPayment> filter = wp ->
+                wp.getRequestReferenceNumber() != null && wp.getRequestReferenceNumber().startsWith(prefix);
+        return collectAll((page, size) -> workerPaymentQueryDao.findWithFilters(status, null, null, null, null, page, size), filter);
     }
 
     @Transactional(readOnly = true)
     public List<WorkerPayment> findByFileId(String fileId) {
         log.info("Finding worker payments for fileId: {} using query DAO", fileId);
-        // Using paginated method with large page size to get all results
-        return workerPaymentQueryDao.findByFileId(fileId, 0, 10000).getContent();
+        return collectAll((page, size) -> workerPaymentQueryDao.findByFileId(fileId, page, size));
     }
 
     @Transactional(readOnly = true)
     public List<WorkerPayment> findByFileIdAndStatus(String fileId, String status) {
         log.info("Finding worker payments for fileId: {} with status: {} using query DAO", fileId, status);
-        return workerPaymentQueryDao.findWithFilters(status, null, fileId, null, null, 0, 10000).getContent();
+        return collectAll((page, size) -> workerPaymentQueryDao.findWithFilters(status, null, fileId, null, null, page, size));
     }
 
     @Transactional(readOnly = true)
@@ -108,8 +135,7 @@ public class WorkerPaymentService {
     @Transactional(readOnly = true)
     public List<WorkerPayment> findAll() {
         log.info("Retrieving all worker payments using query DAO");
-        // Use a large page size to get all results
-        return workerPaymentQueryDao.findWithFilters(null, null, null, null, null, 0, 100000).getContent();
+        return collectAll((page, size) -> workerPaymentQueryDao.findWithFilters(null, null, null, null, null, page, size));
     }
     
     @Transactional(readOnly = true)
@@ -216,29 +242,6 @@ public class WorkerPaymentService {
         var result = workerPaymentQueryDao.findWithFilters(null, null, uploadedFileRef, null, null, 
                                                            pageable.getPageNumber(), pageable.getPageSize());
         return createPageFromPageResult(result, pageable);
-    }
-    
-    /**
-     * Cursor-based pagination for worker payments (stub implementation).
-     * @param status Payment status filter
-     * @param receiptNumber Receipt number filter
-     * @param startDate Start date
-     * @param endDate End date
-     * @param sort Sort order
-     * @param nextPageToken Opaque cursor for next page
-     * @return Page of WorkerPayment
-     */
-    public Page<WorkerPayment> findByStatusAndReceiptNumberAndDateRangeWithToken(
-            String status,
-            String receiptNumber,
-            java.time.LocalDateTime startDate,
-            java.time.LocalDateTime endDate,
-            org.springframework.data.domain.Sort sort,
-            String nextPageToken) {
-        // TODO: Implement real cursor-based pagination logic
-        // For now, fallback to first page of classic pagination
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 20, sort);
-        return findByStatusAndReceiptNumberAndDateRange(status, receiptNumber, startDate, endDate, pageable);
     }
     
     // Utility method to convert PageResult to Spring Page
