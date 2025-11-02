@@ -1,15 +1,24 @@
 # Development environment configuration
 spring:
   datasource:
+    # PostgreSQL connection for payment-flow service with RLS/VPD
     url: jdbc:postgresql://localhost:5432/labormanagement?currentSchema=payment_flow
     driver-class-name: org.postgresql.Driver
-    username: ${DB_USERNAME:root}
+    username: ${DB_USERNAME:app_payment_flow}
     password: ${DB_PASSWORD:root}
-    # Legacy MySQL reference (kept for rollback):
-    # url: jdbc:mysql://localhost:3306/payment_flow_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    # driver-class-name: com.mysql.cj.jdbc.Driver
-    # username: root
-    # password: root
+    # HikariCP connection pooling configuration
+    # CRITICAL: These settings ensure transaction-local RLS context persists
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 600000          # 10 minutes
+      max-lifetime: 1800000         # 30 minutes
+      connection-timeout: 30000     # 30 seconds
+      auto-commit: true             # Important: allows transaction-local settings
+      leak-detection-threshold: 60000  # 1 minute
+      data-source-properties:
+        preparedStatementCacheSize: 250
+        preparedStatementCacheSqlLimit: 2048
   jpa:
     hibernate:
       ddl-auto: none
