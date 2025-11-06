@@ -1,16 +1,20 @@
 package com.example.paymentflow.employer.dao;
 
-import com.shared.common.dao.BaseQueryDao;
 import com.example.paymentflow.employer.entity.EmployerPaymentReceipt;
+import com.example.paymentflow.common.sql.SqlTemplateLoader;
+import com.shared.common.dao.BaseQueryDao;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * DAO for Employer Payment Receipt read operations using custom queries.
@@ -19,20 +23,32 @@ import java.util.Optional;
 @Repository
 public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
     
-    private static final String BASE_SELECT = """
-        SELECT id, employer_receipt_number, worker_receipt_number, employer_id, toli_id,
-               transaction_reference, validated_by, validated_at, total_records, 
-               total_amount, status
-        FROM employer_payment_receipts
-        """;
+    private static final String BASE_SELECT_TEMPLATE = "sql/employer/employer_payment_receipts_base_select.sql";
+    private static final String BASE_COUNT_TEMPLATE = "sql/employer/employer_payment_receipts_count.sql";
+    private static final String PENDING_VALIDATION_TEMPLATE = "sql/employer/employer_payment_receipts_pending_validation.sql";
+    private static final String PENDING_VALIDATION_COUNT_TEMPLATE = "sql/employer/employer_payment_receipts_pending_validation_count.sql";
+
+    private final DSLContext dsl;
+    private final SqlTemplateLoader sqlTemplates;
+
+    public EmployerPaymentReceiptQueryDao(DSLContext dsl, SqlTemplateLoader sqlTemplates) {
+        this.dsl = dsl;
+        this.sqlTemplates = sqlTemplates;
+    }
     
-    private static final String BASE_COUNT = "SELECT COUNT(*) FROM employer_payment_receipts";
-    
+    private String baseSelect() {
+        return sqlTemplates.load(BASE_SELECT_TEMPLATE);
+    }
+
+    private String baseCount() {
+        return sqlTemplates.load(BASE_COUNT_TEMPLATE);
+    }
+
     /**
      * Find by ID with custom query
      */
     public Optional<EmployerPaymentReceipt> findById(Long id) {
-        String sql = BASE_SELECT + " WHERE id = :id";
+        String sql = baseSelect() + " WHERE id = :id";
         Map<String, Object> params = Map.of("id", id);
         return queryForObject(sql, params, this::mapEmployerPaymentReceipt);
     }
@@ -41,7 +57,7 @@ public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
      * Find by employer receipt number
      */
     public Optional<EmployerPaymentReceipt> findByEmployerReceiptNumber(String employerReceiptNumber) {
-        String sql = BASE_SELECT + " WHERE employer_receipt_number = :empRef";
+        String sql = baseSelect() + " WHERE employer_receipt_number = :empRef";
         Map<String, Object> params = Map.of("empRef", employerReceiptNumber);
         return queryForObject(sql, params, this::mapEmployerPaymentReceipt);
     }
@@ -50,7 +66,7 @@ public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
      * Find by worker receipt number
      */
     public Optional<EmployerPaymentReceipt> findByWorkerReceiptNumber(String workerReceiptNumber) {
-        String sql = BASE_SELECT + " WHERE worker_receipt_number = :workerRef";
+        String sql = baseSelect() + " WHERE worker_receipt_number = :workerRef";
         Map<String, Object> params = Map.of("workerRef", workerReceiptNumber);
         return queryForObject(sql, params, this::mapEmployerPaymentReceipt);
     }
@@ -90,8 +106,8 @@ public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
             params.put("endDate", endDate);
         }
         
-        String baseSql = BASE_SELECT + whereClause + " ORDER BY validated_at DESC";
-        String countSql = BASE_COUNT + whereClause;
+        String baseSql = baseSelect() + whereClause + " ORDER BY validated_at DESC";
+        String countSql = baseCount() + whereClause;
         
         return queryForPage(baseSql, countSql, params, page, size, this::mapEmployerPaymentReceipt);
     }
@@ -100,8 +116,8 @@ public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
      * Find by status with pagination
      */
     public PageResult<EmployerPaymentReceipt> findByStatus(String status, int page, int size) {
-        String sql = BASE_SELECT + " WHERE status = :status ORDER BY validated_at DESC";
-        String countSql = BASE_COUNT + " WHERE status = :status";
+        String sql = baseSelect() + " WHERE status = :status ORDER BY validated_at DESC";
+        String countSql = baseCount() + " WHERE status = :status";
         Map<String, Object> params = Map.of("status", status);
         
         return queryForPage(sql, countSql, params, page, size, this::mapEmployerPaymentReceipt);
@@ -111,8 +127,8 @@ public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
      * Find by validator with pagination
      */
     public PageResult<EmployerPaymentReceipt> findByValidatedBy(String validatedBy, int page, int size) {
-        String sql = BASE_SELECT + " WHERE validated_by = :validatedBy ORDER BY validated_at DESC";
-        String countSql = BASE_COUNT + " WHERE validated_by = :validatedBy";
+        String sql = baseSelect() + " WHERE validated_by = :validatedBy ORDER BY validated_at DESC";
+        String countSql = baseCount() + " WHERE validated_by = :validatedBy";
         Map<String, Object> params = Map.of("validatedBy", validatedBy);
         
         return queryForPage(sql, countSql, params, page, size, this::mapEmployerPaymentReceipt);
@@ -122,7 +138,7 @@ public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
      * Find by transaction reference for MT940 reconciliation
      */
     public List<EmployerPaymentReceipt> findByTransactionReference(String transactionReference) {
-        String sql = BASE_SELECT + " WHERE transaction_reference = :txnRef ORDER BY validated_at DESC";
+        String sql = baseSelect() + " WHERE transaction_reference = :txnRef ORDER BY validated_at DESC";
         Map<String, Object> params = Map.of("txnRef", transactionReference);
         return queryForList(sql, params, this::mapEmployerPaymentReceipt);
     }
@@ -132,8 +148,8 @@ public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
      */
     public PageResult<EmployerPaymentReceipt> findByDateRange(LocalDateTime startDate, LocalDateTime endDate,
                                                             int page, int size) {
-        String sql = BASE_SELECT + " WHERE validated_at BETWEEN :startDate AND :endDate ORDER BY validated_at DESC";
-        String countSql = BASE_COUNT + " WHERE validated_at BETWEEN :startDate AND :endDate";
+        String sql = baseSelect() + " WHERE validated_at BETWEEN :startDate AND :endDate ORDER BY validated_at DESC";
+        String countSql = baseCount() + " WHERE validated_at BETWEEN :startDate AND :endDate";
         
         Map<String, Object> params = Map.of(
             "startDate", startDate,
@@ -147,54 +163,36 @@ public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
      * Get validation statistics
      */
     public Map<String, Object> getValidationStatistics(LocalDateTime startDate, LocalDateTime endDate) {
-        String sql = """
-            SELECT 
-                COUNT(*) as total_receipts,
-                SUM(total_amount) as total_amount_sum,
-                SUM(validated_amount) as validated_amount_sum,
-                AVG(total_amount) as average_total_amount,
-                AVG(validated_amount) as average_validated_amount,
-                COUNT(DISTINCT status) as unique_statuses,
-                COUNT(DISTINCT validated_by) as unique_validators
-            FROM employer_payment_receipts 
-            WHERE validated_at BETWEEN :startDate AND :endDate
-            """;
-        
-        Map<String, Object> params = Map.of(
-            "startDate", startDate,
-            "endDate", endDate
-        );
-        
-        return namedParameterJdbcTemplate.queryForMap(sql, params);
+        String sql = sqlTemplates.load("sql/employer/employer_validation_statistics.sql");
+        Map<String, Object> result = dsl.resultQuery(sql, startDate, endDate).fetchOneMap();
+        return result != null ? result : Map.of();
     }
     
     /**
      * Get status distribution
      */
     public Map<String, Long> getStatusDistribution() {
-        String sql = """
-            SELECT status, COUNT(*) as count 
-            FROM employer_payment_receipts 
-            GROUP BY status 
-            ORDER BY count DESC
-            """;
-        
-        List<Map<String, Object>> results = namedParameterJdbcTemplate.queryForList(sql, Map.of());
-        
-        Map<String, Long> statusDistribution = new HashMap<>();
-        for (Map<String, Object> row : results) {
-            statusDistribution.put((String) row.get("status"), ((Number) row.get("count")).longValue());
-        }
-        
-        return statusDistribution;
+        String sql = sqlTemplates.load("sql/employer/employer_status_distribution.sql");
+        return dsl.resultQuery(sql)
+                .fetch()
+                .stream()
+                .collect(Collectors.toMap(
+                        record -> record.get("status", String.class),
+                        record -> {
+                            Number count = record.get("count", Number.class);
+                            return count != null ? count.longValue() : 0L;
+                        },
+                        (existing, replacement) -> replacement,
+                        LinkedHashMap::new
+                ));
     }
     
     /**
      * Get receipts pending validation
      */
     public PageResult<EmployerPaymentReceipt> findPendingValidation(int page, int size) {
-        String sql = BASE_SELECT + " WHERE status = 'PENDING_VALIDATION' ORDER BY created_at ASC";
-        String countSql = BASE_COUNT + " WHERE status = 'PENDING_VALIDATION'";
+        String sql = sqlTemplates.load(PENDING_VALIDATION_TEMPLATE);
+        String countSql = sqlTemplates.load(PENDING_VALIDATION_COUNT_TEMPLATE);
         
         return queryForPage(sql, countSql, Map.of(), page, size, this::mapEmployerPaymentReceipt);
     }
@@ -206,12 +204,12 @@ public class EmployerPaymentReceiptQueryDao extends BaseQueryDao {
                                                                            LocalDateTime startDate, 
                                                                            LocalDateTime endDate,
                                                                            int page, int size) {
-        String sql = BASE_SELECT + """ 
+        String sql = baseSelect() + """ 
             WHERE validated_by = :validatedBy 
             AND validated_at BETWEEN :startDate AND :endDate 
             ORDER BY validated_at DESC
             """;
-        String countSql = BASE_COUNT + """ 
+        String countSql = baseCount() + """ 
             WHERE validated_by = :validatedBy 
             AND validated_at BETWEEN :startDate AND :endDate
             """;

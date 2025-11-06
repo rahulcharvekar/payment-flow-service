@@ -228,6 +228,23 @@ Configuration lives in `src/main/resources/application.yml` and `application-dev
 
 ---
 
+## SQL Templates for Analysts
+Some reporting-style queries now live in plain `.sql` files so analysts can adjust them without touching Java code.
+
+- Files live under `src/main/resources/sql/**`. For example:
+  - `sql/worker/worker_payment_summary.sql`
+  - `sql/worker/worker_payment_status_counts.sql`
+  - `sql/employer/employer_validation_statistics.sql`
+  - `sql/employer/employer_status_distribution.sql`
+- The service loads them at runtime through a shared loader (`SqlTemplateLoader`) and executes them with jOOQ, so the syntax should stay ANSI/Postgres compatible.
+- Keep column aliases stable (`status`, `count`, etc.); downstream code maps results by these names.
+- Use positional placeholders (`?`) for parameters. The calling DAO binds them in the documented order—double-check before rearranging.
+- After editing a template, restart the service (templates are cached on first access) and, if possible, add a note to QA about the change.
+
+When in doubt, coordinate with the backend team; they can help add new templates or wire additional columns into the API response objects.
+
+---
+
 ## Next Steps
 - Add automated integration tests that exercise the entire file upload ➜ validate ➜ generate ➜ send-to-employer flow.
 - Create or request a sample CSV to drop into `uploads/dev/` so teammates can practice quickly.
@@ -235,4 +252,3 @@ Configuration lives in `src/main/resources/application.yml` and `application-dev
 - If you need non-Mermaid diagrams, export the provided flows to PNG and store them in the repository wiki.
 
 Happy testing! If anything here is unclear, leave comments in the README or open a ticket so we can keep improving this guide.
-

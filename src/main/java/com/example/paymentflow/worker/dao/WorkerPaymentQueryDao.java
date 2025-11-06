@@ -1,16 +1,20 @@
 package com.example.paymentflow.worker.dao;
 
-import com.shared.common.dao.BaseQueryDao;
+import com.example.paymentflow.common.sql.SqlTemplateLoader;
 import com.example.paymentflow.worker.entity.WorkerPayment;
+import com.shared.common.dao.BaseQueryDao;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * DAO for Worker Payment read operations using custom queries.
@@ -19,21 +23,30 @@ import java.util.Optional;
 @Repository
 public class WorkerPaymentQueryDao extends BaseQueryDao {
     
-    // Base SQL for worker payments
-    private static final String BASE_SELECT = """
-        SELECT id, worker_reference, registration_id, worker_name, employer_id, toli_id, toli, 
-               aadhar, pan, bank_account, payment_amount, request_reference_number, 
-               receipt_number, status, file_id, uploaded_file_ref, created_at
-        FROM worker_payments
-        """;
+    private static final String BASE_SELECT_TEMPLATE = "sql/worker/worker_payments_base_select.sql";
+    private static final String BASE_COUNT_TEMPLATE = "sql/worker/worker_payments_count.sql";
+
+    private final DSLContext dsl;
+    private final SqlTemplateLoader sqlTemplates;
+
+    public WorkerPaymentQueryDao(DSLContext dsl, SqlTemplateLoader sqlTemplates) {
+        this.dsl = dsl;
+        this.sqlTemplates = sqlTemplates;
+    }
     
-    private static final String BASE_COUNT = "SELECT COUNT(*) FROM worker_payments";
+    private String baseSelect() {
+        return sqlTemplates.load(BASE_SELECT_TEMPLATE);
+    }
+
+    private String baseCount() {
+        return sqlTemplates.load(BASE_COUNT_TEMPLATE);
+    }
     
     /**
      * Find worker payment by ID
      */
     public Optional<WorkerPayment> findById(Long id) {
-        String sql = BASE_SELECT + " WHERE id = :id";
+        String sql = baseSelect() + " WHERE id = :id";
         Map<String, Object> params = Map.of("id", id);
         return queryForObject(sql, params, this::mapWorkerPayment);
     }
@@ -74,8 +87,8 @@ public class WorkerPaymentQueryDao extends BaseQueryDao {
             params.put("endDate", endDate);
         }
         
-        String baseSql = BASE_SELECT + whereClause + " ORDER BY created_at DESC";
-        String countSql = BASE_COUNT + whereClause;
+        String baseSql = baseSelect() + whereClause + " ORDER BY created_at DESC";
+        String countSql = baseCount() + whereClause;
         
         return queryForPage(baseSql, countSql, params, page, size, this::mapWorkerPayment);
     }
@@ -84,8 +97,8 @@ public class WorkerPaymentQueryDao extends BaseQueryDao {
      * Find by status with pagination
      */
     public PageResult<WorkerPayment> findByStatus(String status, int page, int size) {
-        String sql = BASE_SELECT + " WHERE status = :status ORDER BY created_at DESC";
-        String countSql = BASE_COUNT + " WHERE status = :status";
+        String sql = baseSelect() + " WHERE status = :status ORDER BY created_at DESC";
+        String countSql = baseCount() + " WHERE status = :status";
         Map<String, Object> params = Map.of("status", status);
         
         return queryForPage(sql, countSql, params, page, size, this::mapWorkerPayment);
@@ -95,7 +108,7 @@ public class WorkerPaymentQueryDao extends BaseQueryDao {
      * Find by receipt number
      */
     public List<WorkerPayment> findByReceiptNumber(String receiptNumber) {
-        String sql = BASE_SELECT + " WHERE receipt_number = :receiptNumber ORDER BY created_at DESC";
+        String sql = baseSelect() + " WHERE receipt_number = :receiptNumber ORDER BY created_at DESC";
         Map<String, Object> params = Map.of("receiptNumber", receiptNumber);
         return queryForList(sql, params, this::mapWorkerPayment);
     }
@@ -104,8 +117,8 @@ public class WorkerPaymentQueryDao extends BaseQueryDao {
      * Find by file ID with pagination
      */
     public PageResult<WorkerPayment> findByFileId(String fileId, int page, int size) {
-        String sql = BASE_SELECT + " WHERE file_id = :fileId ORDER BY created_at DESC";
-        String countSql = BASE_COUNT + " WHERE file_id = :fileId";
+        String sql = baseSelect() + " WHERE file_id = :fileId ORDER BY created_at DESC";
+        String countSql = baseCount() + " WHERE file_id = :fileId";
         Map<String, Object> params = Map.of("fileId", fileId);
         
         return queryForPage(sql, countSql, params, page, size, this::mapWorkerPayment);
@@ -115,29 +128,26 @@ public class WorkerPaymentQueryDao extends BaseQueryDao {
      * Get status counts for a file
      */
     public Map<String, Long> getStatusCountsByFileId(String fileId) {
-        String sql = """
-            SELECT status, COUNT(*) as count 
-            FROM worker_payments 
-            WHERE file_id = :fileId 
-            GROUP BY status
-            """;
-        
-        Map<String, Object> params = Map.of("fileId", fileId);
-        List<Map<String, Object>> results = namedParameterJdbcTemplate.queryForList(sql, params);
-        
-        Map<String, Long> statusCounts = new HashMap<>();
-        for (Map<String, Object> row : results) {
-            statusCounts.put((String) row.get("status"), ((Number) row.get("count")).longValue());
-        }
-        
-        return statusCounts;
+        String sql = sqlTemplates.load("sql/worker/worker_payment_status_counts.sql");
+        return dsl.resultQuery(sql, fileId)
+                .fetch()
+                .stream()
+                .collect(Collectors.toMap(
+                        record -> record.get("status", String.class),
+                        record -> {
+                            Number count = record.get("count", Number.class);
+                            return count != null ? count.longValue() : 0L;
+                        },
+                        (existing, replacement) -> replacement,
+                        LinkedHashMap::new
+                ));
     }
     
     /**
      * Find payments by request reference number prefix
      */
     public List<WorkerPayment> findByRequestReferenceNumberStartingWith(String prefix) {
-        String sql = BASE_SELECT + " WHERE request_reference_number LIKE :prefix ORDER BY created_at DESC";
+        String sql = baseSelect() + " WHERE request_reference_number LIKE :prefix ORDER BY created_at DESC";
         Map<String, Object> params = Map.of("prefix", prefix + "%");
         return queryForList(sql, params, this::mapWorkerPayment);
     }
@@ -147,8 +157,8 @@ public class WorkerPaymentQueryDao extends BaseQueryDao {
      */
     public PageResult<WorkerPayment> findByDateRange(LocalDateTime startDate, LocalDateTime endDate, 
                                                     int page, int size) {
-        String sql = BASE_SELECT + " WHERE created_at BETWEEN :startDate AND :endDate ORDER BY created_at DESC";
-        String countSql = BASE_COUNT + " WHERE created_at BETWEEN :startDate AND :endDate";
+        String sql = baseSelect() + " WHERE created_at BETWEEN :startDate AND :endDate ORDER BY created_at DESC";
+        String countSql = baseCount() + " WHERE created_at BETWEEN :startDate AND :endDate";
         
         Map<String, Object> params = Map.of(
             "startDate", startDate,
@@ -162,20 +172,9 @@ public class WorkerPaymentQueryDao extends BaseQueryDao {
      * Get summary statistics
      */
     public Map<String, Object> getPaymentSummary(String fileId) {
-        String sql = """
-            SELECT 
-                COUNT(*) as total_payments,
-                SUM(payment_amount) as total_amount,
-                AVG(payment_amount) as average_amount,
-                MIN(payment_amount) as min_amount,
-                MAX(payment_amount) as max_amount,
-                COUNT(DISTINCT status) as status_count
-            FROM worker_payments 
-            WHERE file_id = :fileId
-            """;
-        
-        Map<String, Object> params = Map.of("fileId", fileId);
-        return namedParameterJdbcTemplate.queryForMap(sql, params);
+        String sql = sqlTemplates.load("sql/worker/worker_payment_summary.sql");
+        Map<String, Object> result = dsl.resultQuery(sql, fileId).fetchOneMap();
+        return result != null ? result : Map.of();
     }
     
     /**
