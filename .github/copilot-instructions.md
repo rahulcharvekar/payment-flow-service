@@ -298,241 +298,109 @@ public class PaymentReportDao {
 
 ## Audit Logging Guidelines ⭐ CRITICAL
 
-**ALWAYS consult `documentation/LBE/architecture/audit-design.md` for complete audit system documentation.**
+**Read:** `documentation/LBE/architecture/audit-design.md` | `documentation/LBE/reference/audit-quick-reference.md`
 
-### Centralized Audit Schema
+### Two Audit Mechanisms
 
-This service writes to a **centralized audit schema** shared across all services:
+| Mechanism                 | Purpose                                            | Implementation                                                  |
+| ------------------------- | -------------------------------------------------- | --------------------------------------------------------------- |
+| **API-Level Auditing**    | Log controller actions, endpoints, business events | `@Auditable` annotation on controllers                          |
+| **Entity-Level Auditing** | Track data changes with tamper detection           | `@EntityListeners(SharedEntityAuditListener.class)` on entities |
 
-- **audit.audit_event** - General action logging (API calls, user actions, system events)
-- **audit.entity_audit_event** - Entity-level change tracking with hash chains
-
-### Configuration
-
-Audit configuration is in `application.yml`:
+### Configuration (DO NOT CHANGE)
 
 ```yaml
 shared-lib:
   audit:
     enabled: true
-    table-name: audit.audit_event
-    service-name: payment-flow-service # DO NOT CHANGE
-    source-schema: payment_flow # DO NOT CHANGE
+    service-name: payment-flow-service
+    source-schema: payment_flow
   entity-audit:
     enabled: true
-    table-name: audit.entity_audit_event
-    service-name: payment-flow-service # DO NOT CHANGE
-    source-schema: payment_flow # DO NOT CHANGE
-    source-table: worker_payments # Primary table for this service
+    service-name: payment-flow-service
+    source-schema: payment_flow
+    source-table: worker_payments
 ```
 
-**CRITICAL:** Never modify `service-name` or `source-schema` values—these enable cross-service audit queries.
+### 1. API-Level Auditing with @Auditable
 
-### When to Use Each Audit Table
+```java
+@RestController
+@RequestMapping("/api/payments")
+public class PaymentController {
 
-#### Use audit.audit_event for:
+    @PostMapping
+    @Auditable(
+        action = "PAYMENT_INITIATED",
+        entityType = "PAYMENT",
+        description = "Worker initiated payment request"
+    )
+    public ResponseEntity<Payment> createPayment(@RequestBody PaymentRequest request) {
+        // Audit logged automatically with endpoint, user_id, trace_id, status
+    }
 
-- ✅ Payment processing events (initiation, status changes, completion)
-- ✅ Worker/employer actions (document uploads, approvals, rejections)
-- ✅ File upload events (receipts, bank files)
-- ✅ Integration events (gateway calls, external API interactions)
-- ✅ Status transitions (pending → approved → paid)
-- ✅ Validation failures and business rule violations
-- ✅ Reconciliation matching events
+    @PutMapping("/{id}/approve")
+    @Auditable(
+        action = "PAYMENT_APPROVED",
+        entityType = "PAYMENT",
+        includeResponseBody = false  // Skip large responses
+    )
+    public ResponseEntity<?> approvePayment(@PathVariable Long id) {
+        // Business logic
+    }
+}
+```
 
-#### Use audit.entity_audit_event for:
+### 2. Entity-Level Auditing
 
-- ✅ Payment record changes (create, update, delete)
-- ✅ Worker/employer entity modifications
-- ✅ Receipt metadata changes
-- ✅ Bank transaction modifications
-- ✅ Any sensitive payment data requiring tamper detection
+```java
+@Entity
+@Table(name = "worker_payments", schema = "payment_flow")
+@EntityListeners(SharedEntityAuditListener.class)
+public class Payment {
+    // All changes tracked with before/after values + hash chain
+}
+```
 
-### Manual Audit Logging
+### 3. Manual Auditing for File Uploads
 
 ```java
 @Autowired
 private AuditTrailService auditTrailService;
 
-public void processPayment(PaymentRequest request, Long userId) {
-    // Business logic
-    Payment payment = createPayment(request);
-    paymentRepository.save(payment);
-
-    // Log audit event
-    auditTrailService.logAction(
-        userId,                                    // user_id
-        "PAYMENT_INITIATED",                       // action
-        "PAYMENT",                                 // entity_type
-        String.valueOf(payment.getId()),           // entity_id
-        payment.getReference(),                    // entity_name
-        String.format("Payment initiated for worker %s, amount %.2f",
-            payment.getWorkerId(), payment.getAmount()),  // description
-        Map.of(                                    // metadata
-            "amount", payment.getAmount(),
-            "currency", payment.getCurrency(),
-            "worker_id", payment.getWorkerId(),
-            "employer_id", payment.getEmployerId(),
-            "trace_id", traceId
-        )
-    );
+public void handleFileUpload(MultipartFile file, Long workerId) {
+    // Save file
+    auditTrailService.logAction(workerId, "DOCUMENT_UPLOADED", "RECEIPT",
+        receiptId, file.getOriginalFilename(),
+        String.format("Uploaded %s (%d bytes)", file.getOriginalFilename(), file.getSize()),
+        Map.of("file_size", file.getSize(), "content_type", file.getContentType()));
 }
 ```
 
-### Automatic Entity Audit
+### Best Practices
 
-Enable automatic audit for JPA entities:
+**DO:**
 
-```java
-@Entity
-@Table(name = "worker_payments", schema = "payment_flow")
-@EntityListeners(SharedEntityAuditListener.class)  // Enable automatic auditing
-public class Payment {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+- ✅ Use `@Auditable` on payment endpoints (create, approve, reject, cancel)
+- ✅ Use `@EntityListeners` on Payment, Worker, Employer entities
+- ✅ Log file uploads with metadata (size, type, worker_id)
+- ✅ Track payment status transitions
 
-    private BigDecimal amount;
-    private String status;
-    private Long workerId;
+**DON'T:**
 
-    // All changes to this entity are automatically audited with:
-    // - before/after values
-    // - cryptographic hash chain for tamper detection
-    // - operation type (INSERT, UPDATE, DELETE)
-}
-```
+- ❌ Log bank account numbers, card details
+- ❌ Skip audit for failed payments (log failures too)
+- ❌ Use generic action names (be specific: PAYMENT_APPROVED)
 
-### Audit Best Practices for Payment Flow Service
+### Payment Service Audit Checklist
 
-#### DO:
+- [ ] Payment CRUD endpoints have `@Auditable`
+- [ ] File upload/download actions are logged
+- [ ] Payment/Worker/Employer entities have `@EntityListeners`
+- [ ] Status transitions are tracked
+- [ ] Integration calls (external gateways) are audited
 
-✅ Log all payment lifecycle events (create, update, complete, fail)  
-✅ Log file uploads with file metadata (size, type, upload time)  
-✅ Include trace_id in all audit events for request correlation  
-✅ Log status transitions with before/after states  
-✅ Use entity audit for Payment table changes (automatically tracked)  
-✅ Log worker/employer actions with actor identification  
-✅ Include payment_id and worker_id whenever available  
-✅ Tag events with business-meaningful actions (PAYMENT_APPROVED, DOCUMENT_UPLOADED)
-
-#### DON'T:
-
-❌ Log sensitive payment details (bank account numbers, card info) in audit metadata  
-❌ Skip audit logging for failed operations—failures are critical for fraud detection  
-❌ Modify audit tables directly—they're append-only  
-❌ Delete audit records (archive instead)  
-❌ Use generic action names like "UPDATE" (be specific: "PAYMENT_STATUS_UPDATE")
-
-### Common Audit Patterns for Payment Flow
-
-#### Payment Initiation
-
-```java
-auditTrailService.logAction(
-    userId,
-    "PAYMENT_INITIATED",
-    "PAYMENT",
-    String.valueOf(paymentId),
-    paymentReference,
-    String.format("Payment of %.2f initiated for worker %s", amount, workerId),
-    Map.of(
-        "amount", amount,
-        "currency", currency,
-        "worker_id", workerId,
-        "employer_id", employerId,
-        "trace_id", traceId
-    )
-);
-```
-
-#### Document Upload
-
-```java
-auditTrailService.logAction(
-    userId,
-    "DOCUMENT_UPLOADED",
-    "RECEIPT",
-    String.valueOf(receiptId),
-    fileName,
-    String.format("Uploaded %s (%d bytes)", fileName, fileSize),
-    Map.of(
-        "file_name", fileName,
-        "file_size", fileSize,
-        "file_type", contentType,
-        "worker_id", workerId,
-        "upload_timestamp", uploadTime
-    )
-);
-```
-
-#### Payment Status Change
-
-```java
-auditTrailService.logAction(
-    userId,
-    "PAYMENT_STATUS_CHANGED",
-    "PAYMENT",
-    String.valueOf(paymentId),
-    paymentReference,
-    String.format("Payment status changed from %s to %s", oldStatus, newStatus),
-    Map.of(
-        "old_status", oldStatus,
-        "new_status", newStatus,
-        "changed_by", userId,
-        "reason", changeReason
-    )
-);
-```
-
-### Querying Audit Logs
-
-```java
-// Use AuditEventRepository for programmatic queries
-@Autowired
-private AuditEventRepository auditEventRepository;
-
-// Find all payment actions
-List<AuditEvent> paymentActivity = auditEventRepository
-    .findByEntityTypeAndServiceName("PAYMENT", "payment-flow-service");
-
-// Find all events for a worker
-List<AuditEvent> workerEvents = auditEventRepository
-    .findByMetadataContaining("worker_id", workerId.toString());
-```
-
-### Troubleshooting Audit Issues
-
-| Issue                      | Check                                                                                  |
-| -------------------------- | -------------------------------------------------------------------------------------- |
-| Audit events not appearing | Verify `shared-lib.audit.enabled=true` in config                                       |
-| Entity audit not working   | Ensure `@EntityListeners(SharedEntityAuditListener.class)` on entity                   |
-| Permission denied errors   | Check database grants: `GRANT INSERT, SELECT ON audit.audit_event TO payment_app_role` |
-| Hash chain broken          | Check logs for concurrent modifications; contact security team                         |
-
-### Testing Audit Logging
-
-```java
-@Test
-public void testPaymentInitiationAudit() {
-    // Perform action
-    Payment payment = paymentService.initiatePayment(request);
-
-    // Verify audit event created
-    List<AuditEvent> events = auditEventRepository
-        .findByActionAndEntityId("PAYMENT_INITIATED", payment.getId().toString());
-
-    assertThat(events).hasSize(1);
-    assertThat(events.get(0).getServiceName()).isEqualTo("payment-flow-service");
-    assertThat(events.get(0).getSourceSchema()).isEqualTo("payment_flow");
-}
-```
-
-### References
-
-- **Full Documentation:** `documentation/LBE/architecture/audit-design.md`
-- **Quick Reference:** `documentation/LBE/reference/audit-quick-reference.md`
-- **Configuration:** Review shared-lib audit properties in `application.yml`
+**Troubleshooting:** Check `shared-lib.audit.enabled=true` | Verify DB grants | See audit-design.md
 
 ## Building and Testing
 
