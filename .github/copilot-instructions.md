@@ -175,18 +175,21 @@ This service uses **all three patterns** extensively:
 ### 1. Spring Data JPA - Use for:
 
 ✅ **When to use:**
+
 - Payment record creation and updates
 - Worker/employer entity CRUD
 - Status transitions requiring entity callbacks
 - Any mutation on JPA entities
 
 📁 **Examples in this service:**
+
 - `PaymentRepository` - Payment entity persistence
 - `WorkerRepository` - Worker CRUD operations
 - `EmployerRepository` - Employer management
 - `ReconciliationRepository` - Reconciliation record writes
 
 💡 **Rules:**
+
 - Use for all write operations
 - Keep repository interfaces focused on persistence
 - Map to DTOs before returning from controllers
@@ -195,18 +198,21 @@ This service uses **all three patterns** extensively:
 ### 2. jOOQ DSL - Use for:
 
 ✅ **When to use:**
+
 - Worker/employer list endpoints with dynamic filters (pagination, search, sorting)
 - Payment status queries with multiple joins
 - Complex reconciliation matching logic
 - Multi-table queries needing type safety
 
 📁 **Examples in this service:**
+
 - `WorkerQueryDao` - Complex worker queries with filters
 - `EmployerQueryDao` - Employer data with pagination
 - `PaymentQueryDao` - Payment status and history lookups
 - Dynamic filter queries for list endpoints
 
 💡 **Rules:**
+
 - Inject `DSLContext` for all jOOQ operations
 - Use type-safe DSL for dynamic filters
 - Map results to DTOs using small mappers
@@ -215,23 +221,26 @@ This service uses **all three patterns** extensively:
 ### 3. jOOQ + SQL Templates - Use for:
 
 ✅ **When to use:**
+
 - Aggregation queries (`worker_payment_summary`, `employer_status_distribution`)
 - Reporting queries maintained by analysts
 - Complex CTEs and window functions
 - Queries that change frequently
 
 📁 **File locations in this service:**
+
 - `src/main/resources/sql/worker/worker_payment_summary.sql`
 - `src/main/resources/sql/employer/employer_status_distribution.sql`
 - `src/main/resources/sql/reports/payment_reconciliation_report.sql`
 
 📁 **Loading SQL templates:**
+
 ```java
 @Component
 public class PaymentReportDao {
     private final DSLContext dsl;
     private final SqlTemplateLoader templateLoader;
-    
+
     public PaymentSummary getWorkerPaymentSummary(Long workerId) {
         String sql = templateLoader.load("sql/worker/worker_payment_summary.sql");
         return dsl.resultQuery(sql, workerId).fetchOneInto(PaymentSummary.class);
@@ -240,6 +249,7 @@ public class PaymentReportDao {
 ```
 
 💡 **Rules:**
+
 - Load templates via `SqlTemplateLoader` (already available)
 - Keep column aliases stable
 - Document templates in README
@@ -249,17 +259,20 @@ public class PaymentReportDao {
 ### Database Access Rules (ALL PATTERNS)
 
 🔒 **Security & RLS:**
+
 - **ALWAYS** set PostgreSQL session context before queries
 - Use `RLSContext` or similar mechanism
 - Set both `app.current_user_id` and `app.current_tenant_id`
 - Never bypass RLS policies
 
 🔄 **Transactions:**
+
 - Use `@Transactional` for all write operations
 - Consider `@Transactional(readOnly = true)` for reads
 - Coordinate transactions across services carefully
 
 ✅ **Testing:**
+
 - Test with multiple user personas (worker, employer, board)
 - Verify tenant isolation
 - Test dynamic filters and pagination
@@ -282,6 +295,244 @@ public class PaymentReportDao {
 - Test multi-tenancy isolation thoroughly
 - Always include `tenantId` in audit logs
 - Follow patterns in `documentation/LBE/foundations/data-guardrails-101.md`
+
+## Audit Logging Guidelines ⭐ CRITICAL
+
+**ALWAYS consult `documentation/LBE/architecture/audit-design.md` for complete audit system documentation.**
+
+### Centralized Audit Schema
+
+This service writes to a **centralized audit schema** shared across all services:
+
+- **audit.audit_event** - General action logging (API calls, user actions, system events)
+- **audit.entity_audit_event** - Entity-level change tracking with hash chains
+
+### Configuration
+
+Audit configuration is in `application.yml`:
+
+```yaml
+shared-lib:
+  audit:
+    enabled: true
+    table-name: audit.audit_event
+    service-name: payment-flow-service # DO NOT CHANGE
+    source-schema: payment_flow # DO NOT CHANGE
+  entity-audit:
+    enabled: true
+    table-name: audit.entity_audit_event
+    service-name: payment-flow-service # DO NOT CHANGE
+    source-schema: payment_flow # DO NOT CHANGE
+    source-table: worker_payments # Primary table for this service
+```
+
+**CRITICAL:** Never modify `service-name` or `source-schema` values—these enable cross-service audit queries.
+
+### When to Use Each Audit Table
+
+#### Use audit.audit_event for:
+
+- ✅ Payment processing events (initiation, status changes, completion)
+- ✅ Worker/employer actions (document uploads, approvals, rejections)
+- ✅ File upload events (receipts, bank files)
+- ✅ Integration events (gateway calls, external API interactions)
+- ✅ Status transitions (pending → approved → paid)
+- ✅ Validation failures and business rule violations
+- ✅ Reconciliation matching events
+
+#### Use audit.entity_audit_event for:
+
+- ✅ Payment record changes (create, update, delete)
+- ✅ Worker/employer entity modifications
+- ✅ Receipt metadata changes
+- ✅ Bank transaction modifications
+- ✅ Any sensitive payment data requiring tamper detection
+
+### Manual Audit Logging
+
+```java
+@Autowired
+private AuditTrailService auditTrailService;
+
+public void processPayment(PaymentRequest request, Long userId) {
+    // Business logic
+    Payment payment = createPayment(request);
+    paymentRepository.save(payment);
+
+    // Log audit event
+    auditTrailService.logAction(
+        userId,                                    // user_id
+        "PAYMENT_INITIATED",                       // action
+        "PAYMENT",                                 // entity_type
+        String.valueOf(payment.getId()),           // entity_id
+        payment.getReference(),                    // entity_name
+        String.format("Payment initiated for worker %s, amount %.2f",
+            payment.getWorkerId(), payment.getAmount()),  // description
+        Map.of(                                    // metadata
+            "amount", payment.getAmount(),
+            "currency", payment.getCurrency(),
+            "worker_id", payment.getWorkerId(),
+            "employer_id", payment.getEmployerId(),
+            "trace_id", traceId
+        )
+    );
+}
+```
+
+### Automatic Entity Audit
+
+Enable automatic audit for JPA entities:
+
+```java
+@Entity
+@Table(name = "worker_payments", schema = "payment_flow")
+@EntityListeners(SharedEntityAuditListener.class)  // Enable automatic auditing
+public class Payment {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private BigDecimal amount;
+    private String status;
+    private Long workerId;
+
+    // All changes to this entity are automatically audited with:
+    // - before/after values
+    // - cryptographic hash chain for tamper detection
+    // - operation type (INSERT, UPDATE, DELETE)
+}
+```
+
+### Audit Best Practices for Payment Flow Service
+
+#### DO:
+
+✅ Log all payment lifecycle events (create, update, complete, fail)  
+✅ Log file uploads with file metadata (size, type, upload time)  
+✅ Include trace_id in all audit events for request correlation  
+✅ Log status transitions with before/after states  
+✅ Use entity audit for Payment table changes (automatically tracked)  
+✅ Log worker/employer actions with actor identification  
+✅ Include payment_id and worker_id whenever available  
+✅ Tag events with business-meaningful actions (PAYMENT_APPROVED, DOCUMENT_UPLOADED)
+
+#### DON'T:
+
+❌ Log sensitive payment details (bank account numbers, card info) in audit metadata  
+❌ Skip audit logging for failed operations—failures are critical for fraud detection  
+❌ Modify audit tables directly—they're append-only  
+❌ Delete audit records (archive instead)  
+❌ Use generic action names like "UPDATE" (be specific: "PAYMENT_STATUS_UPDATE")
+
+### Common Audit Patterns for Payment Flow
+
+#### Payment Initiation
+
+```java
+auditTrailService.logAction(
+    userId,
+    "PAYMENT_INITIATED",
+    "PAYMENT",
+    String.valueOf(paymentId),
+    paymentReference,
+    String.format("Payment of %.2f initiated for worker %s", amount, workerId),
+    Map.of(
+        "amount", amount,
+        "currency", currency,
+        "worker_id", workerId,
+        "employer_id", employerId,
+        "trace_id", traceId
+    )
+);
+```
+
+#### Document Upload
+
+```java
+auditTrailService.logAction(
+    userId,
+    "DOCUMENT_UPLOADED",
+    "RECEIPT",
+    String.valueOf(receiptId),
+    fileName,
+    String.format("Uploaded %s (%d bytes)", fileName, fileSize),
+    Map.of(
+        "file_name", fileName,
+        "file_size", fileSize,
+        "file_type", contentType,
+        "worker_id", workerId,
+        "upload_timestamp", uploadTime
+    )
+);
+```
+
+#### Payment Status Change
+
+```java
+auditTrailService.logAction(
+    userId,
+    "PAYMENT_STATUS_CHANGED",
+    "PAYMENT",
+    String.valueOf(paymentId),
+    paymentReference,
+    String.format("Payment status changed from %s to %s", oldStatus, newStatus),
+    Map.of(
+        "old_status", oldStatus,
+        "new_status", newStatus,
+        "changed_by", userId,
+        "reason", changeReason
+    )
+);
+```
+
+### Querying Audit Logs
+
+```java
+// Use AuditEventRepository for programmatic queries
+@Autowired
+private AuditEventRepository auditEventRepository;
+
+// Find all payment actions
+List<AuditEvent> paymentActivity = auditEventRepository
+    .findByEntityTypeAndServiceName("PAYMENT", "payment-flow-service");
+
+// Find all events for a worker
+List<AuditEvent> workerEvents = auditEventRepository
+    .findByMetadataContaining("worker_id", workerId.toString());
+```
+
+### Troubleshooting Audit Issues
+
+| Issue                      | Check                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| Audit events not appearing | Verify `shared-lib.audit.enabled=true` in config                                       |
+| Entity audit not working   | Ensure `@EntityListeners(SharedEntityAuditListener.class)` on entity                   |
+| Permission denied errors   | Check database grants: `GRANT INSERT, SELECT ON audit.audit_event TO payment_app_role` |
+| Hash chain broken          | Check logs for concurrent modifications; contact security team                         |
+
+### Testing Audit Logging
+
+```java
+@Test
+public void testPaymentInitiationAudit() {
+    // Perform action
+    Payment payment = paymentService.initiatePayment(request);
+
+    // Verify audit event created
+    List<AuditEvent> events = auditEventRepository
+        .findByActionAndEntityId("PAYMENT_INITIATED", payment.getId().toString());
+
+    assertThat(events).hasSize(1);
+    assertThat(events.get(0).getServiceName()).isEqualTo("payment-flow-service");
+    assertThat(events.get(0).getSourceSchema()).isEqualTo("payment_flow");
+}
+```
+
+### References
+
+- **Full Documentation:** `documentation/LBE/architecture/audit-design.md`
+- **Quick Reference:** `documentation/LBE/reference/audit-quick-reference.md`
+- **Configuration:** Review shared-lib audit properties in `application.yml`
 
 ## Building and Testing
 
@@ -320,16 +571,19 @@ mvn clean generate-sources
 ### Adding a New API Endpoint (e.g., GET /api/payments/by-worker/{workerId})
 
 **Step 1: Consult Documentation**
+
 - Read `documentation/LBE/reference/raw/RBAC/MAPPINGS/PHASE5_ENDPOINT_POLICY_MAPPINGS.md` (sections 13-16)
 - Check payment workflow policies in `documentation/LBE/reference/policy-matrix.md`
 - Review `documentation/LBE/guides/data-access-patterns.md`
 
 **Step 2: Determine Data Access Pattern**
+
 1. Simple payment lookup by ID? → Use JPA Repository
 2. List with filters (status, date range, pagination)? → Use jOOQ DSL
 3. Aggregation or analyst-maintained report? → Use jOOQ + SQL Template
 
 **Step 3: Implement**
+
 1. Create DTO classes in `dto/` package
 2. Create appropriate DAO/Repository
 3. Implement service layer business logic
@@ -338,11 +592,13 @@ mvn clean generate-sources
 6. Ensure RLS context is set
 
 **Step 4: Register in Auth Catalog** (via auth-service)
+
 1. Create migration to register endpoint in `auth.endpoints`
 2. Link to policies via `auth.endpoint_policies`
 3. Update `documentation/LBE/reference/raw/RBAC/MAPPINGS/PHASE5_ENDPOINT_POLICY_MAPPINGS.md`
 
 **Step 5: Test & Document**
+
 1. Write unit tests for business logic
 2. Write integration tests for database queries
 3. Test with worker/employer/board personas
@@ -423,7 +679,9 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 ## Essential Reading (Start Here) 🎯
 
 ### Platform & Security Baseline
+
 1. **`documentation/LBE/README.md`** – Guided path through Auth + RLS journey
+
    - Follow Steps 1–3 before touching payment endpoints
    - Ensures JWT/RLS assumptions stay aligned
 
@@ -432,6 +690,7 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 4. **`documentation/LBE/guides/login-to-data.md`** – Worker, employer, board personas: login → policy → RLS
 
 ### Payment Flow Architecture
+
 - **`documentation/LBE/architecture/request-lifecycle.md`** – Request flow including payment operations
 - **`documentation/LBE/architecture/policy-binding.md`** – Permission interconnections for payment workflows
 - **`documentation/LBE/architecture/audit-design.md`** – Payment Flow section: audit logging requirements
@@ -439,18 +698,21 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 ## Implementation Guides (Use While Coding) 💻
 
 ### Data Access Patterns ⭐ CRITICAL ⭐
+
 - **`documentation/LBE/guides/data-access-patterns.md`** – **Read before writing ANY database code**
   - Payment Flow service examples showing all three patterns
   - When to use JPA vs jOOQ DSL vs jOOQ + SQL templates
   - Migration guidance between patterns
 
 ### Security & Authorization
+
 - **`documentation/LBE/foundations/access-control-101.md`** – RBAC fundamentals
 - **`documentation/LBE/foundations/data-guardrails-101.md`** – RLS primer for payment data
 - **`documentation/LBE/guides/integrate-your-service.md`** – Connecting to auth service
 - **`documentation/LBE/guides/verify-permissions.md`** – Testing payment workflow permissions
 
 ### Setup & Local Development
+
 - **`documentation/LBE/guides/local-environment.md`** – Local setup instructions
 - **`documentation/LBE/guides/setup/rbac.md`** – RBAC setup for payment endpoints
 - **`documentation/LBE/guides/setup/vpd.md`** – RLS setup for payment data
@@ -460,6 +722,7 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 ### Payment Flow Specific References
 
 #### Endpoint Mappings
+
 - **`documentation/LBE/reference/raw/RBAC/MAPPINGS/PHASE5_ENDPOINT_POLICY_MAPPINGS.md`**
   - **Section 13** – Worker upload endpoints and policies
   - **Section 14** – Payment record endpoints
@@ -468,20 +731,24 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
   - Update these sections when adding/modifying payment endpoints
 
 #### Endpoint Categorization
+
 - **`documentation/LBE/reference/raw/RBAC/MAPPINGS/PHASE1_ENDPOINTS_EXTRACTION.md`**
   - Endpoint category counts for worker/employer/board workflows
   - Seeds onboarding scripts and regression matrices
 
 #### Capability Mappings
+
 - **`documentation/LBE/reference/raw/RBAC/MAPPINGS/PHASE4_POLICY_CAPABILITY_MAPPINGS.md`**
   - Payment Management/Request capability coverage per role
   - Update when new capabilities or UI actions added
 
 #### Role Narratives
+
 - **`documentation/LBE/reference/raw/ONBOARDING_ROLES.md`** – Role descriptions with payment workflow context
 - **`documentation/LBE/reference/raw/RBAC/ROLES.md`** – Which payment flow screens/actions each persona owns
 
 ### General References
+
 - **`documentation/LBE/reference/role-catalog.md`** – All roles (worker, employer, board, admin)
 - **`documentation/LBE/reference/policy-matrix.md`** – Policy mappings for payment operations
 - **`documentation/LBE/reference/TABLE_NAMES_REFERENCE.md`** – Canonical `payment_flow` schema
@@ -491,18 +758,21 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 ## Troubleshooting & Operations 🔧
 
 ### Problem Resolution
+
 - **`documentation/LBE/playbooks/troubleshoot-auth.md`** – Auth/authorization troubleshooting
   - JWT validation issues affecting payment access
   - RLS context problems
   - Policy resolution failures
 
 ### Operational References
+
 - **`documentation/LBE/reference/postgres-operations.md`** – PostgreSQL operations for payment_flow schema
 - **`documentation/LBE/foundations/postgres-for-auth.md`** – Database role management
 
 ## Maintenance Checklist ✅
 
 ### When Adding/Modifying Payment Endpoints
+
 1. ✅ Determine data access pattern from `documentation/LBE/guides/data-access-patterns.md`
 2. ✅ Implement with appropriate pattern (JPA/jOOQ DSL/jOOQ+SQL)
 3. ✅ Define endpoint with OpenAPI annotations
@@ -516,6 +786,7 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 11. ✅ Document in `documentation/LBE/reference/recent-updates.md`
 
 ### When Changing Payment Schema
+
 1. ✅ Write migration script
 2. ✅ Update `documentation/LBE/reference/TABLE_NAMES_REFERENCE.md`
 3. ✅ Update `documentation/LBE/architecture/data-map.md` if relationships change
@@ -524,12 +795,14 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 6. ✅ Document in `documentation/LBE/reference/recent-updates.md`
 
 ### When Modifying Audit/Logging
+
 1. ✅ Confirm config matches `documentation/LBE/reference/audit-quick-reference.md`
 2. ✅ Ensure `service_name` = `payment-flow-service` and `source_schema` = `payment_flow`
 3. ✅ Update Payment Flow subsection in `documentation/LBE/architecture/audit-design.md`
 4. ✅ Verify compliance requirements still met
 
 ### When Adding SQL Templates
+
 1. ✅ Create template in `src/main/resources/sql/<domain>/`
 2. ✅ Use stable column aliases
 3. ✅ Document parameters and expected results
@@ -538,6 +811,7 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 6. ✅ Note in `documentation/LBE/reference/recent-updates.md` if analyst-facing
 
 ### Major Releases
+
 1. ✅ Capture summary in `documentation/LBE/reference/recent-updates.md`
 2. ✅ Update any changed endpoint mappings
 3. ✅ Review and update affected guides
@@ -546,6 +820,7 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 ## Key Principles 🎯
 
 ### Security First 🔒
+
 - ✅ Always set RLS context before queries
 - ✅ Validate payment authorization with policies
 - ✅ Never bypass tenant checks
@@ -553,6 +828,7 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 - ✅ Follow `documentation/LBE/foundations/data-guardrails-101.md`
 
 ### Data Access Pattern Discipline 💾
+
 - ✅ **Always** consult `documentation/LBE/guides/data-access-patterns.md` first
 - ✅ Use JPA for writes and simple reads
 - ✅ Use jOOQ DSL for complex queries with dynamic filters
@@ -560,12 +836,14 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 - ✅ Test all patterns thoroughly
 
 ### Documentation Driven 📝
+
 - ✅ Read relevant docs BEFORE coding
 - ✅ Update docs WITH your code changes
 - ✅ Keep endpoint mappings current
 - ✅ Document SQL templates clearly
 
 ### Test Comprehensively 🧪
+
 - ✅ Test with worker, employer, board personas
 - ✅ Test tenant isolation
 - ✅ Test authorization (RBAC)
@@ -574,18 +852,18 @@ The canonical product, RBAC, and data docs live in the shared documentation proj
 
 ## Quick Links by Task 🔗
 
-| Task | Primary Documentation |
-|------|----------------------|
-| Setting up local environment | `documentation/LBE/guides/local-environment.md` |
-| Understanding payment architecture | `documentation/LBE/architecture/overview.md` |
-| **Choosing data access pattern** | **`documentation/LBE/guides/data-access-patterns.md`** ⭐ |
-| Finding payment endpoint policies | `documentation/LBE/reference/raw/RBAC/MAPPINGS/PHASE5_ENDPOINT_POLICY_MAPPINGS.md` (§13-16) |
-| Adding new payment endpoint | `documentation/LBE/guides/extend-access.md` |
-| Understanding payment roles | `documentation/LBE/reference/role-catalog.md` |
-| Debugging authorization | `documentation/LBE/playbooks/troubleshoot-auth.md` |
-| Understanding RLS for payments | `documentation/LBE/foundations/data-guardrails-101.md` |
-| Payment schema reference | `documentation/LBE/reference/TABLE_NAMES_REFERENCE.md` |
-| Checking recent changes | `documentation/LBE/reference/recent-updates.md` |
+| Task                               | Primary Documentation                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| Setting up local environment       | `documentation/LBE/guides/local-environment.md`                                             |
+| Understanding payment architecture | `documentation/LBE/architecture/overview.md`                                                |
+| **Choosing data access pattern**   | **`documentation/LBE/guides/data-access-patterns.md`** ⭐                                   |
+| Finding payment endpoint policies  | `documentation/LBE/reference/raw/RBAC/MAPPINGS/PHASE5_ENDPOINT_POLICY_MAPPINGS.md` (§13-16) |
+| Adding new payment endpoint        | `documentation/LBE/guides/extend-access.md`                                                 |
+| Understanding payment roles        | `documentation/LBE/reference/role-catalog.md`                                               |
+| Debugging authorization            | `documentation/LBE/playbooks/troubleshoot-auth.md`                                          |
+| Understanding RLS for payments     | `documentation/LBE/foundations/data-guardrails-101.md`                                      |
+| Payment schema reference           | `documentation/LBE/reference/TABLE_NAMES_REFERENCE.md`                                      |
+| Checking recent changes            | `documentation/LBE/reference/recent-updates.md`                                             |
 
 ---
 
