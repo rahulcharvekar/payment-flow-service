@@ -35,11 +35,11 @@ com.example.paymentflow/
 
 **ALWAYS read `documentation/LBE/guides/data-access-patterns.md` before writing database code.**
 
-| Pattern              | Use For                                 | Examples                                  |
-| -------------------- | --------------------------------------- | ----------------------------------------- |
-| **JPA Repository**   | CRUD, writes, simple reads              | `PaymentRepository`, `WorkerRepository`   |
-| **jOOQ DSL**         | Complex queries, multi-joins, filters   | `WorkerQueryDao`, `PaymentQueryDao`       |
-| **jOOQ + SQL Files** | Analyst reports, aggregations, CTEs     | `sql/worker/worker_payment_summary.sql`   |
+| Pattern              | Use For                               | Examples                                |
+| -------------------- | ------------------------------------- | --------------------------------------- |
+| **JPA Repository**   | CRUD, writes, simple reads            | `PaymentRepository`, `WorkerRepository` |
+| **jOOQ DSL**         | Complex queries, multi-joins, filters | `WorkerQueryDao`, `PaymentQueryDao`     |
+| **jOOQ + SQL Files** | Analyst reports, aggregations, CTEs   | `sql/worker/worker_payment_summary.sql` |
 
 ### Rules for ALL Patterns
 
@@ -48,8 +48,6 @@ com.example.paymentflow/
 ✅ **Testing:** Test with multiple personas, verify RLS isolation
 
 **Details:** See `documentation/LBE/guides/data-access-patterns.md`
-
-
 
 ## Security Guidelines
 
@@ -112,18 +110,19 @@ public class Payment {
 ### Best Practices
 
 **DO:**
+
 - ✅ Use `@Auditable` on payment endpoints (create, approve, reject, cancel)
 - ✅ Use `@EntityListeners` on Payment, Worker, Employer entities
 - ✅ Log file uploads with metadata (size, type, worker_id)
 - ✅ Track payment status transitions
 
 **DON'T:**
+
 - ❌ Log bank account numbers, card details
 - ❌ Skip audit for failed payments (log failures too)
 - ❌ Use generic action names (be specific: PAYMENT_APPROVED)
 
 **Troubleshooting:** Check `shared-lib.audit.enabled=true` | Verify DB grants | See audit-design.md
-
 
 ## Common Tasks
 
@@ -166,21 +165,25 @@ public class Payment {
 ## Essential Reading 🎯
 
 **Start Here:**
+
 - `documentation/LBE/README.md` – Guided journey through auth system
 - `documentation/LBE/architecture/overview.md` – System topology and flows
 - `documentation/LBE/architecture/data-map.md` – Table relationships
 - `documentation/LBE/architecture/audit-design.md` – Audit system ⭐
 
 **Foundations:**
+
 - `documentation/LBE/foundations/access-control-101.md` – RBAC fundamentals
 - `documentation/LBE/foundations/data-guardrails-101.md` – RLS primer
 
 ## Implementation Guides 💻
 
 **Data Access (CRITICAL):**
+
 - `documentation/LBE/guides/data-access-patterns.md` ⭐ – **Read before ANY database code**
 
 **Workflows:**
+
 - `documentation/LBE/guides/login-to-data.md` – Login → JWT → RLS flow
 - `documentation/LBE/guides/setup/rbac.md` – RBAC setup
 - `documentation/LBE/guides/setup/vpd.md` – RLS/VPD setup
@@ -203,6 +206,7 @@ public class Payment {
 ## Maintenance Checklist ✅
 
 **Adding Endpoint:**
+
 1. Choose data pattern (`data-access-patterns.md`)
 2. Implement: DTO → DAO → Service → Controller
 3. Register: `auth.endpoints` + `auth.endpoint_policies`
@@ -210,18 +214,21 @@ public class Payment {
 5. Test: Authorization + RLS
 
 **Modifying Roles/Policies:**
+
 1. SQL migration
 2. Update: `policy-matrix.md` + `role-catalog.md`
 3. Test with personas
 4. Document in `recent-updates.md`
 
 **Schema Changes:**
+
 1. Migration script
 2. Update: `data-map.md` + `TABLE_NAMES_REFERENCE.md`
 3. Test RLS
 4. Document in `recent-updates.md`
 
 **Audit Changes:**
+
 1. Match `audit-quick-reference.md`
 2. Update `audit-design.md` (Payment Flow section)
 3. Ensure compliance
@@ -234,17 +241,17 @@ public class Payment {
 
 ## Quick Links 🔗
 
-| Task | Documentation |
-|------|---------------|
-| Local setup | `guides/local-environment.md` |
-| Architecture | `architecture/overview.md` |
-| **Data access** | **`guides/data-access-patterns.md`** ⭐ |
-| Add endpoint | `guides/extend-access.md` |
-| Create role/policy | `guides/setup/rbac.md` |
-| Debug auth | `playbooks/troubleshoot-auth.md` |
-| RLS | `foundations/data-guardrails-101.md` |
-| PostgreSQL ops | `reference/postgres-operations.md` |
-| Recent changes | `reference/recent-updates.md` |
+| Task               | Documentation                           |
+| ------------------ | --------------------------------------- |
+| Local setup        | `guides/local-environment.md`           |
+| Architecture       | `architecture/overview.md`              |
+| **Data access**    | **`guides/data-access-patterns.md`** ⭐ |
+| Add endpoint       | `guides/extend-access.md`               |
+| Create role/policy | `guides/setup/rbac.md`                  |
+| Debug auth         | `playbooks/troubleshoot-auth.md`        |
+| RLS                | `foundations/data-guardrails-101.md`    |
+| PostgreSQL ops     | `reference/postgres-operations.md`      |
+| Recent changes     | `reference/recent-updates.md`           |
 
 ---
 
